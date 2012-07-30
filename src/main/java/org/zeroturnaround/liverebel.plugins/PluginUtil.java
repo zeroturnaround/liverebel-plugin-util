@@ -36,12 +36,11 @@ public class PluginUtil {
     this.logger = logger;
   }
 
-  public boolean perform(File deployableFile, File metadata, String contextPath, UpdateStrategies updateStrategies, List<String> deployableServers, String app, String ver) {
+  public boolean perform(File deployableFile, File metadata, String contextPath, Boolean undeploy, UpdateStrategies updateStrategies, List<String> deployableServers, String app, String ver) {
     if (this.commandCenter == null) {
       logger.log("ERROR! Failed to connect to Command Center, most likely plugin failed to call initCommandCenter(CommandCenterFactory);");
       return false;
     }
-    logger.log("Deploying artifacts.");
 
     boolean result = false;
     Boolean tempFileCreated = false;
@@ -56,14 +55,8 @@ public class PluginUtil {
 
       LiveRebelXml lrXml = OverrideLiveRebelXmlUtil.getLiveRebelXml(deployableFile);
       ApplicationInfo applicationInfo = getCommandCenter().getApplication(lrXml.getApplicationId());
-      uploadIfNeeded(applicationInfo, lrXml.getVersionId(), deployableFile);
-      if (metadata != null)
-        uploadMetadata(lrXml, metadata);
+      doActions(deployableFile, metadata, contextPath, undeploy, updateStrategies, deployableServers, lrXml, applicationInfo);
 
-      if (updateStrategies != null) {
-        update(lrXml, applicationInfo, deployableServers, contextPath, updateStrategies);
-        logger.log(String.format(ARTIFACT_DEPLOYED_AND_UPDATED, deployableServers.size(), deployableFile));
-      }
       result = true;
     }
     catch (IllegalArgumentException e) {
@@ -109,6 +102,29 @@ public class PluginUtil {
       return result;
 
     return true;
+  }
+
+  private void doActions(File deployableFile, File metadata, String contextPath, Boolean undeploy, UpdateStrategies updateStrategies, List<String> deployableServers, LiveRebelXml lrXml, ApplicationInfo applicationInfo) throws IOException, InterruptedException {
+    uploadIfNeeded(applicationInfo, lrXml.getVersionId(), deployableFile);
+    if (metadata != null)
+      uploadMetadata(lrXml, metadata);
+
+    if (updateStrategies != null) {
+      update(lrXml, applicationInfo, deployableServers, contextPath, updateStrategies);
+      logger.log(String.format(ARTIFACT_DEPLOYED_AND_UPDATED, deployableServers.size(), deployableFile));
+    }
+
+    if (undeploy)
+      undeploy(lrXml.getApplicationId(), deployableServers);
+  }
+
+  private void undeploy(String applicationId, List<String> selectedServers) {
+    logger.log(String.format("Undeploying application %s on %s.\n", applicationId, selectedServers));
+    if (selectedServers.isEmpty()) {
+      throw new IllegalArgumentException("Undeploy selected with no online servers!");
+    }
+    commandCenter.undeploy(applicationId, selectedServers);
+    logger.log(String.format("SUCCESS: Application undeploying from %s.\n", selectedServers));
   }
 
   private void uploadMetadata(LiveRebelXml liveRebelXml, File metadata) {

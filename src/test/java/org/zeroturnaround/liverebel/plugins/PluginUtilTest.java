@@ -54,7 +54,7 @@ public class PluginUtilTest {
     doReturn(diffResult).when(pluginUtilSpy).getDifferences((LiveRebelXml)any(), anyString());
     pluginUtilSpy.initCommandCenter(commandCenterFactory);
 
-    assertTrue(pluginUtilSpy.perform(new File(archivesDir, "lr-demo-ver1.war"), null, "testDefaultUpdate", defaultUpdateStrategies, Lists.newArrayList("dummy"), null, null));
+    assertTrue(pluginUtilSpy.perform(new File(archivesDir, "lr-demo-ver1.war"), null, "testDefaultUpdate", false, defaultUpdateStrategies, Lists.newArrayList("dummy"), null, null));
     assertEquals("HOTPATCH", testConfigurableUpdateSpy.updateMode);
     assertFalse(testConfigurableUpdateSpy.isOffline());
     assertFalse(testConfigurableUpdateSpy.isRolling());
@@ -80,7 +80,7 @@ public class PluginUtilTest {
     doReturn(diffResult).when(pluginUtilSpy).getDifferences((LiveRebelXml)any(), anyString());
     pluginUtilSpy.initCommandCenter(commandCenterFactory);
 
-    assertTrue(pluginUtilSpy.perform(new File(archivesDir, "lr-demo-ver1.war"), null, "testDefaultUpdate", defaultUpdateStrategies, Lists.newArrayList("dummy"), null, null));
+    assertTrue(pluginUtilSpy.perform(new File(archivesDir, "lr-demo-ver1.war"), null, "testRolling", false, defaultUpdateStrategies, Lists.newArrayList("dummy"), null, null));
     assertEquals("ROLLING", testConfigurableUpdateSpy.updateMode);
     assertTrue(testConfigurableUpdateSpy.isRolling());
     assertFalse(testConfigurableUpdateSpy.isOffline());
@@ -106,7 +106,7 @@ public class PluginUtilTest {
     doReturn(diffResult).when(pluginUtilSpy).getDifferences((LiveRebelXml)any(), anyString());
     pluginUtilSpy.initCommandCenter(commandCenterFactory);
 
-    assertTrue(pluginUtilSpy.perform(new File(archivesDir, "lr-demo-ver1.war"), null, "testDefaultUpdate", defaultUpdateStrategies, Lists.newArrayList("dummy"), null, null));
+    assertTrue(pluginUtilSpy.perform(new File(archivesDir, "lr-demo-ver1.war"), null, "testOffline", false, defaultUpdateStrategies, Lists.newArrayList("dummy"), null, null));
     assertEquals("OFFLINE", testConfigurableUpdateSpy.updateMode);
     assertTrue(testConfigurableUpdateSpy.isOffline());
     assertFalse(testConfigurableUpdateSpy.isRolling());

@@ -7,6 +7,7 @@ import com.zeroturnaround.liverebel.api.update.PausedUpdate;
 import com.zeroturnaround.liverebel.api.update.PausingUpdate;
 import com.zeroturnaround.liverebel.api.update.RunningUpdate;
 
+import java.io.File;
 import java.util.Collection;
 
 public class TestConfigurableUpdateImpl implements ConfigurableUpdate {
@@ -61,6 +62,10 @@ public class TestConfigurableUpdateImpl implements ConfigurableUpdate {
   }
 
   public ConfigurableUpdate enableAutoStrategy(boolean ignoreWarnings) {
+    return this;
+  }
+
+  public ConfigurableUpdate setScriptExecutionDescription(File scriptDescription) {
     return this;
   }
 
