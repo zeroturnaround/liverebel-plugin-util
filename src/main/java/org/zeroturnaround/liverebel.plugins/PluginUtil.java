@@ -37,7 +37,10 @@ public class PluginUtil {
   }
 
   public boolean perform(File deployableFile, File metadata, String contextPath, UpdateStrategies updateStrategies, List<String> deployableServers, String app, String ver) {
-
+    if (this.commandCenter == null) {
+      logger.log("ERROR! Failed to connect to Command Center, most likely plugin failed to call initCommandCenter(CommandCenterFactory);");
+      return false;
+    }
     logger.log("Deploying artifacts.");
 
     boolean result = false;
@@ -191,6 +194,7 @@ public class PluginUtil {
 
   void activate(LiveRebelXml lrXml, Set<String> serverIds, Level diffLevel, UpdateStrategies updateStrategies) throws IOException,
     InterruptedException {
+    logger.log("Beginning activation of " + lrXml.getApplicationId() + " " + lrXml.getVersionId() + " on servers: " + serverIds);
     ConfigurableUpdate update = getCommandCenter().update(lrXml.getApplicationId(), lrXml.getVersionId());
 
     if (updateStrategies.isDefault()) {
@@ -247,6 +251,7 @@ public class PluginUtil {
     logger.log("activeVersions: " + activeVersions);
 
     for (String server : selectedServers) {
+      logger.log("servers: " + server);
       if (!activeVersions.containsKey(server))
         deployServers.add(server);
     }
