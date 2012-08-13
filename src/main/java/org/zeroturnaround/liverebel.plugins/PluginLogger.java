@@ -6,7 +6,12 @@ package org.zeroturnaround.liverebel.plugins;
 public interface PluginLogger {
 
   /**
-   * Print the message to standard output
+   * Log the message
    */
   void log(String message);
+
+  /**
+   * Log the error. Some plugins may want to log errors differently
+   */
+  void error(String error);
 }

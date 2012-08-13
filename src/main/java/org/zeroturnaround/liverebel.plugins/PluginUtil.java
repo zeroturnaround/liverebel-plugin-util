@@ -3,6 +3,7 @@ package org.zeroturnaround.liverebel.plugins;
 import com.zeroturnaround.liverebel.api.ApplicationInfo;
 import com.zeroturnaround.liverebel.api.CommandCenter;
 import com.zeroturnaround.liverebel.api.CommandCenterFactory;
+import com.zeroturnaround.liverebel.api.Conflict;
 import com.zeroturnaround.liverebel.api.ConnectException;
 import com.zeroturnaround.liverebel.api.DuplicationException;
 import com.zeroturnaround.liverebel.api.Forbidden;
@@ -30,18 +31,19 @@ import java.util.zip.ZipException;
 public class PluginUtil {
   private PluginLogger logger;
   private CommandCenter commandCenter;
+  private CommandCenterFactory commandCenterFactory;
   public static final String ARTIFACT_DEPLOYED_AND_UPDATED = "SUCCESS. Artifact deployed and activated in all %d servers: %s\n";
 
-  public PluginUtil(PluginLogger logger) {
+  public PluginUtil(CommandCenterFactory commandCenterFactory, PluginLogger logger) {
     this.logger = logger;
+    this.commandCenterFactory = commandCenterFactory;
   }
 
   public boolean perform(File deployableFile, File metadata, String contextPath, Boolean undeploy, UpdateStrategies updateStrategies, List<String> deployableServers, String app, String ver) {
-    if (this.commandCenter == null) {
-      logger.log("ERROR! Failed to connect to Command Center, most likely plugin failed to call initCommandCenter(CommandCenterFactory);");
-      return false;
+    if (!initCommandCenter(commandCenterFactory) || this.commandCenter == null) {
+        logger.log("ERROR! Failed to connect to Command Center, please configure connection parameters!");
+        return false;
     }
-
     boolean result = false;
     Boolean tempFileCreated = false;
 
@@ -58,6 +60,9 @@ public class PluginUtil {
       doActions(deployableFile, metadata, contextPath, undeploy, updateStrategies, deployableServers, lrXml, applicationInfo);
 
       result = true;
+    }
+    catch (Conflict e) {
+      logger.log("ERROR: " + e.getMessage());
     }
     catch (IllegalArgumentException e) {
       logger.log("ERROR: " + e.getMessage());
@@ -202,7 +207,7 @@ public class PluginUtil {
 
   void deploy(LiveRebelXml lrXml, Set<String> serverIds, String contextPath) {
     logger.log(String.format("Deploying new application on %s.\n", serverIds));
-    if (contextPath.equals(""))
+    if (contextPath == null || contextPath.equals(""))
       contextPath = null;
     getCommandCenter().deploy(lrXml.getApplicationId(), lrXml.getVersionId(), contextPath, serverIds);
     logger.log(String.format("SUCCESS: Application deployed to %s.\n", serverIds));
@@ -317,6 +322,10 @@ public class PluginUtil {
 
   public CommandCenter getCommandCenter() {
     return commandCenter;
+  }
+
+  public static boolean isMetadataSupported(CommandCenter commandCenter) {
+    return commandCenter != null && !commandCenter.getVersion().equals("2.0");
   }
   
   private  String getStackTrace(Throwable aThrowable) {

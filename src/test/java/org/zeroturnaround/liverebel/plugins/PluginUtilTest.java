@@ -47,7 +47,7 @@ public class PluginUtilTest {
     TestConfigurableUpdateImpl testConfigurableUpdateSpy = spy(new TestConfigurableUpdateImpl());
     Mockito.when(commandCenter.update((String) any(), (String) any())).thenReturn(testConfigurableUpdateSpy);
 
-    PluginUtil pluginUtil = new PluginUtil(new TestPluginLogger());
+    PluginUtil pluginUtil = new PluginUtil(commandCenterFactory, new TestPluginLogger());
     PluginUtil pluginUtilSpy = spy(pluginUtil);
     DiffResult diffResult = mock(DiffResult.class);
     Mockito.when(diffResult.getMaxLevel()).thenReturn(Level.INFO);
@@ -73,7 +73,7 @@ public class PluginUtilTest {
     TestConfigurableUpdateImpl testConfigurableUpdateSpy = spy(new TestConfigurableUpdateImpl());
     Mockito.when(commandCenter.update(anyString(), anyString())).thenReturn(testConfigurableUpdateSpy);
 
-    PluginUtil pluginUtil = new PluginUtil(new TestPluginLogger());
+    PluginUtil pluginUtil = new PluginUtil(commandCenterFactory, new TestPluginLogger());
     PluginUtil pluginUtilSpy =  spy(pluginUtil);
     DiffResult diffResult = mock(DiffResult.class);
     Mockito.when(diffResult.getMaxLevel()).thenReturn(Level.INFO);
@@ -99,7 +99,7 @@ public class PluginUtilTest {
     TestConfigurableUpdateImpl testConfigurableUpdateSpy = spy(new TestConfigurableUpdateImpl());
     Mockito.when(commandCenter.update(anyString(), anyString())).thenReturn(testConfigurableUpdateSpy);
 
-    PluginUtil pluginUtil = new PluginUtil(new TestPluginLogger());
+    PluginUtil pluginUtil = new PluginUtil(commandCenterFactory, new TestPluginLogger());
     PluginUtil pluginUtilSpy = spy(pluginUtil);
     DiffResult diffResult = mock(DiffResult.class);
     Mockito.when(diffResult.getMaxLevel()).thenReturn(Level.INFO);
