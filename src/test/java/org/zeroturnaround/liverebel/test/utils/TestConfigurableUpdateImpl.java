@@ -57,7 +57,11 @@ public class TestConfigurableUpdateImpl implements ConfigurableUpdate {
     return this;
   }
 
-  public ConfigurableUpdate enableScriptExecution() {
+    public ConfigurableUpdate disableScriptExecution() {
+        return this;
+    }
+
+    public ConfigurableUpdate enableScriptExecution() {
     return this;
   }
 
