@@ -6,6 +6,7 @@ import com.google.common.collect.Sets;
 import com.zeroturnaround.liverebel.api.ApplicationInfo;
 import com.zeroturnaround.liverebel.api.CommandCenter;
 import com.zeroturnaround.liverebel.api.CommandCenterFactory;
+import com.zeroturnaround.liverebel.api.LocalInfo;
 import com.zeroturnaround.liverebel.api.UploadInfo;
 import com.zeroturnaround.liverebel.api.VersionInfo;
 import com.zeroturnaround.liverebel.api.diff.DiffResult;
@@ -13,12 +14,14 @@ import com.zeroturnaround.liverebel.api.diff.Level;
 import com.zeroturnaround.liverebel.util.LiveRebelXml;
 import org.junit.Test;
 import org.mockito.Mockito;
+import org.omg.PortableInterceptor.SUCCESSFUL;
 import org.zeroturnaround.liverebel.test.utils.TestConfigurableUpdateImpl;
 import org.zeroturnaround.liverebel.test.utils.TestPluginLogger;
 import org.zeroturnaround.liverebel.test.utils.TestUpdateStrategiesImpl;
 
 import java.io.File;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -37,7 +40,7 @@ public class PluginUtilTest {
 
   @Test
   public void testDefaultUpdate() {
-    UpdateStrategies defaultUpdateStrategies = new TestUpdateStrategiesImpl(false, false, 30, false, 30, false);
+    UpdateStrategies defaultUpdateStrategies = new TestUpdateStrategiesImpl(UpdateMode.LIVEREBEL_DEFAULT, UpdateMode.LIVEREBEL_DEFAULT, 30, true, 30);
     CommandCenterFactory commandCenterFactory = Mockito.mock(CommandCenterFactory.class);
     CommandCenter commandCenter = Mockito.mock(CommandCenter.class);
     Mockito.when(commandCenterFactory.newCommandCenter()).thenReturn(commandCenter);
@@ -54,16 +57,22 @@ public class PluginUtilTest {
     doReturn(diffResult).when(pluginUtilSpy).getDifferences((LiveRebelXml)any(), anyString());
     pluginUtilSpy.initCommandCenter(commandCenterFactory);
 
-    assertTrue(pluginUtilSpy.perform(new File(archivesDir, "lr-demo-ver1.war"), null, "testDefaultUpdate", false, defaultUpdateStrategies, Lists.newArrayList("dummy"), null, null));
+    PluginConf conf = new PluginConf(PluginConf.Action.DEPLOY_OR_UPDATE);
+    conf.deployable = new File(archivesDir, "lr-demo-ver1.war");
+    conf.contextPath = "testDefaultUpdate";
+    conf.updateStrategies = defaultUpdateStrategies;
+    conf.serverIds = Lists.newArrayList("dummy");
+
+    assertEquals(PluginUtil.PluginActionResult.SUCCESS, pluginUtilSpy.perform(conf));
     assertEquals("HOTPATCH", testConfigurableUpdateSpy.updateMode);
     assertFalse(testConfigurableUpdateSpy.isOffline());
     assertFalse(testConfigurableUpdateSpy.isRolling());
-    verify(testConfigurableUpdateSpy).enableAutoStrategy(false);
+    verify(testConfigurableUpdateSpy).enableAutoStrategy(true);
   }
 
   @Test
   public void testRolling() {
-    UpdateStrategies defaultUpdateStrategies = new TestUpdateStrategiesImpl(false, false, 30, true, 30, false);
+    UpdateStrategies defaultUpdateStrategies = new TestUpdateStrategiesImpl(UpdateMode.ROLLING_RESTARTS, UpdateMode.LIVEREBEL_DEFAULT, 30, true, 30);
     CommandCenterFactory commandCenterFactory = Mockito.mock(CommandCenterFactory.class);
     CommandCenter commandCenter = Mockito.mock(CommandCenter.class);
     Mockito.when(commandCenterFactory.newCommandCenter()).thenReturn(commandCenter);
@@ -80,7 +89,13 @@ public class PluginUtilTest {
     doReturn(diffResult).when(pluginUtilSpy).getDifferences((LiveRebelXml)any(), anyString());
     pluginUtilSpy.initCommandCenter(commandCenterFactory);
 
-    assertTrue(pluginUtilSpy.perform(new File(archivesDir, "lr-demo-ver1.war"), null, "testRolling", false, defaultUpdateStrategies, Lists.newArrayList("dummy"), null, null));
+    PluginConf conf = new PluginConf(PluginConf.Action.DEPLOY_OR_UPDATE);
+    conf.deployable = new File(archivesDir, "lr-demo-ver1.war");
+    conf.contextPath = "testRolling";
+    conf.updateStrategies = defaultUpdateStrategies;
+    conf.serverIds = Lists.newArrayList("dummy", "dummy2");
+
+    assertEquals(PluginUtil.PluginActionResult.SUCCESS, pluginUtilSpy.perform(conf));
     assertEquals("ROLLING", testConfigurableUpdateSpy.updateMode);
     assertTrue(testConfigurableUpdateSpy.isRolling());
     assertFalse(testConfigurableUpdateSpy.isOffline());
@@ -89,7 +104,7 @@ public class PluginUtilTest {
 
   @Test
   public void testOffline() {
-    UpdateStrategies defaultUpdateStrategies = new TestUpdateStrategiesImpl(false, false, 30, false, 30, true);
+    UpdateStrategies defaultUpdateStrategies = new TestUpdateStrategiesImpl(UpdateMode.OFFLINE, UpdateMode.LIVEREBEL_DEFAULT, 30, true, 30);
     CommandCenterFactory commandCenterFactory = Mockito.mock(CommandCenterFactory.class);
     CommandCenter commandCenter = Mockito.mock(CommandCenter.class);
     Mockito.when(commandCenterFactory.newCommandCenter()).thenReturn(commandCenter);
@@ -106,7 +121,13 @@ public class PluginUtilTest {
     doReturn(diffResult).when(pluginUtilSpy).getDifferences((LiveRebelXml)any(), anyString());
     pluginUtilSpy.initCommandCenter(commandCenterFactory);
 
-    assertTrue(pluginUtilSpy.perform(new File(archivesDir, "lr-demo-ver1.war"), null, "testOffline", false, defaultUpdateStrategies, Lists.newArrayList("dummy"), null, null));
+    PluginConf conf = new PluginConf(PluginConf.Action.DEPLOY_OR_UPDATE);
+    conf.deployable = new File(archivesDir, "lr-demo-ver1.war");
+    conf.contextPath = "testOffline";
+    conf.updateStrategies = defaultUpdateStrategies;
+    conf.serverIds = Lists.newArrayList("dummy");
+
+    assertEquals(PluginUtil.PluginActionResult.SUCCESS, pluginUtilSpy.perform(conf));
     assertEquals("OFFLINE", testConfigurableUpdateSpy.updateMode);
     assertTrue(testConfigurableUpdateSpy.isOffline());
     assertFalse(testConfigurableUpdateSpy.isRolling());
@@ -147,6 +168,14 @@ public class PluginUtilTest {
         HashMap<String, String> map = Maps.newHashMap();
         map.put("dummy", "ver0");
         return map;
+      }
+
+      public List<LocalInfo> getLocalInfos() {
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
+      }
+
+      public Map<String, LocalInfo> getLocalInfosMap() {
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
       }
 
       public Set<String> getUrls() {

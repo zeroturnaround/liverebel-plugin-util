@@ -38,12 +38,12 @@
     <dependency>
       <groupId>com.zeroturnaround</groupId>
       <artifactId>lr-api</artifactId>
-      <version>2.1-M4-SNAPSHOT</version>
+      <version>2.5-RC6</version>
     </dependency>
     <dependency>
       <groupId>com.zeroturnaround</groupId>
       <artifactId>lr-util</artifactId>
-      <version>1.20-SNAPSHOT</version>
+      <version>1.20</version>
     </dependency>
     <dependency>
       <groupId>commons-io</groupId>

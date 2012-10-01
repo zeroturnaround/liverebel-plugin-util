@@ -6,29 +6,19 @@ package org.zeroturnaround.liverebel.plugins;
 public interface UpdateStrategies {
 
   /**
-   * @return <code>true</code> if Hotpatch is selected.
+   * @return the user selected primary update strategy
    */
-  boolean isHotpatch();
+  UpdateMode getPrimaryUpdateStrategy();
 
   /**
-   * @return <code>true</code> if full restart (or offline update) is selected.
+   * @return the user selected fallback update strategy
    */
-  boolean isFullRestart();
-
-  /**
-   * @return <code>true</code> if rolling restarts is selected.
-   */
-  boolean isRolling();
+  UpdateMode getFallbackUpdateStrategy();
 
   /**
    * @return <code>true</code> if the user has allowed to use Hotpatching even if the archives are compatible with warning
    */
   boolean updateWithWarnings();
-
-  /**
-   * @return <code>true</code> if the user wants LiveRebel to determine the best strategy
-   */
-  boolean isDefault();
 
   /**
    * @return the session drain timeout in seconds when using rolling restarts

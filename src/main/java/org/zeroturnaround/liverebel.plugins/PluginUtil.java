@@ -28,45 +28,43 @@ import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipException;
 
+import static com.zeroturnaround.liverebel.util.OverrideLiveRebelXmlUtil.getLiveRebelXml;
+
 public class PluginUtil {
   private PluginLogger logger;
   private CommandCenter commandCenter;
   private CommandCenterFactory commandCenterFactory;
   public static final String ARTIFACT_DEPLOYED_AND_UPDATED = "SUCCESS. Artifact deployed and activated in all %d servers: %s\n";
 
+  public enum PluginActionResult {
+    SUCCESS,
+    CONNECTION_ERROR,
+    ERROR
+  }
+
   public PluginUtil(CommandCenterFactory commandCenterFactory, PluginLogger logger) {
     this.logger = logger;
     this.commandCenterFactory = commandCenterFactory;
   }
 
-  public boolean perform(File deployableFile, File metadata, String contextPath, Boolean undeploy, UpdateStrategies updateStrategies, List<String> deployableServers, String app, String ver) {
+  public PluginActionResult perform(PluginConf conf) {
     if (!initCommandCenter(commandCenterFactory) || this.commandCenter == null) {
-        logger.log("ERROR! Failed to connect to Command Center, please configure connection parameters!");
-        return false;
+      logger.log("ERROR! Failed to connect to Command Center, please configure connection parameters!");
+      return PluginActionResult.CONNECTION_ERROR;
     }
-    boolean result = false;
-    Boolean tempFileCreated = false;
-
+    boolean tempFileCreated = false;
+    boolean success = false;
     try {
-      logger.log(String.format("Processing artifact: %s\n", deployableFile));
-
-      if (app != null || ver != null) {
-        deployableFile = OverrideLiveRebelXmlUtil.overrideOrCreateXML(deployableFile, app, ver);
-        tempFileCreated = true;
-      }
-
-      LiveRebelXml lrXml = OverrideLiveRebelXmlUtil.getLiveRebelXml(deployableFile);
-      ApplicationInfo applicationInfo = getCommandCenter().getApplication(lrXml.getApplicationId());
-      doActions(deployableFile, metadata, contextPath, undeploy, updateStrategies, deployableServers, lrXml, applicationInfo);
-
-      result = true;
+      PluginConfVerifier.verifyConf(conf);
+      tempFileCreated = checkForLiveRebelXmlOverride(conf);
+      doActions(conf);
+      success = true;
     }
     catch (Conflict e) {
       logger.log("ERROR: " + e.getMessage());
     }
     catch (IllegalArgumentException e) {
       logger.log("ERROR: " + e.getMessage());
-      logger.log(getStackTrace(e));      
     }
     catch (com.zeroturnaround.liverebel.api.Error e) {
       logger.log("ERROR! Unexpected error received from server.");
@@ -84,8 +82,8 @@ public class PluginUtil {
     catch (RuntimeException e) {
       if (e.getCause() instanceof ZipException) {
         logger.log(String.format(
-          "ERROR! Unable to read artifact (%s). The file you trying to deploy is not an artifact or may be corrupted.\n",
-          deployableFile));
+            "ERROR! Unable to read artifact (%s). The file you trying to deploy is not an artifact or may be corrupted.\n",
+            conf.deployable));
       }
       else {
         logger.log("ERROR! Unexpected error occured:");
@@ -100,27 +98,58 @@ public class PluginUtil {
     }
     finally {
       if (tempFileCreated) {
-        FileUtils.deleteQuietly(deployableFile);
+        FileUtils.deleteQuietly(conf.deployable);
       }
     }
-    if (!result)
-      return result;
-
-    return true;
+    if (success) return PluginActionResult.SUCCESS;
+    return PluginActionResult.ERROR;
   }
 
-  private void doActions(File deployableFile, File metadata, String contextPath, Boolean undeploy, UpdateStrategies updateStrategies, List<String> deployableServers, LiveRebelXml lrXml, ApplicationInfo applicationInfo) throws IOException, InterruptedException {
-    uploadIfNeeded(applicationInfo, lrXml.getVersionId(), deployableFile);
-    if (metadata != null)
-      uploadMetadata(lrXml, metadata);
+  private boolean checkForLiveRebelXmlOverride(PluginConf conf) {
+    if (conf.isLiveRebelXmlOverride()) {
+      conf.deployable = OverrideLiveRebelXmlUtil.overrideOrCreateXML(conf.deployable, conf.overrideApp, conf.overrideVer);
+      return true;
+    }
+    return false;
+  }
 
-    if (updateStrategies != null) {
-      update(lrXml, applicationInfo, deployableServers, contextPath, updateStrategies);
-      logger.log(String.format(ARTIFACT_DEPLOYED_AND_UPDATED, deployableServers.size(), deployableFile));
+  private void doActions(PluginConf conf) throws IOException, InterruptedException {
+    switch (conf.getAction()) {
+      case UPLOAD:
+        upload(conf);
+        break;
+      case DEPLOY_OR_UPDATE:
+        deployOrUpdate(conf);
+        break;
+      case UNDEPLOY:
+        undeploy(conf.undeployId, conf.serverIds);
+        break;
+    }
+  }
+
+  private void deployOrUpdate(PluginConf conf) throws IOException, InterruptedException {
+    upload(conf);
+    LiveRebelXml lrXml = getLiveRebelXml(conf.deployable);
+    ApplicationInfo applicationInfo = getCommandCenter().getApplication(lrXml.getApplicationId());
+    update(lrXml, applicationInfo, conf.serverIds, conf.contextPath, conf.updateStrategies);
+    logger.log(String.format(ARTIFACT_DEPLOYED_AND_UPDATED, conf.serverIds.size(), conf.deployable));
+  }
+
+  private void upload(PluginConf conf) throws IOException, InterruptedException {
+    LiveRebelXml lrXml = getLiveRebelXml(conf.deployable);
+
+    ApplicationInfo applicationInfo = getCommandCenter().getApplication(lrXml.getApplicationId());
+    if (applicationInfo != null && applicationInfo.getVersions().contains(lrXml.getVersionId())) {
+      logger.log("Current version of application is already uploaded. Skipping upload.");
+    }
+    else {
+      uploadArtifact(conf.deployable);
     }
 
-    if (undeploy)
-      undeploy(lrXml.getApplicationId(), deployableServers);
+    if (conf.metadata != null) {
+      uploadMetadata(lrXml, conf.metadata);
+      logger.log(String.format("SUCCESS: Metadata for %s %s was uploaded.\n", lrXml.getApplicationId(), lrXml.getVersionId()));
+    }
   }
 
   private void undeploy(String applicationId, List<String> selectedServers) {
@@ -134,17 +163,6 @@ public class PluginUtil {
 
   private void uploadMetadata(LiveRebelXml liveRebelXml, File metadata) {
     commandCenter.uploadMetadata(metadata, liveRebelXml.getApplicationId(), liveRebelXml.getVersionId());
-  }
-
-  public void uploadIfNeeded(ApplicationInfo applicationInfo, String currentVersion, File archive) throws IOException,
-    InterruptedException {
-    if (applicationInfo != null && applicationInfo.getVersions().contains(currentVersion)) {
-      logger.log("Current version of application is already uploaded. Skipping upload.");
-    }
-    else {
-      uploadArtifact(archive);
-      logger.log(String.format("Artifact uploaded: %s\n", archive));
-    }
   }
 
   private boolean uploadArtifact(File artifact) throws IOException, InterruptedException {
@@ -218,7 +236,7 @@ public class PluginUtil {
     logger.log("Beginning activation of " + lrXml.getApplicationId() + " " + lrXml.getVersionId() + " on servers: " + serverIds);
     ConfigurableUpdate update = getCommandCenter().update(lrXml.getApplicationId(), lrXml.getVersionId());
 
-    if (updateStrategies.isDefault()) {
+    if (updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.LIVEREBEL_DEFAULT)) {
       update.enableAutoStrategy(updateStrategies.updateWithWarnings());
     } else {
       manualUpdateConfiguration(diffLevel, updateStrategies, update);
@@ -228,24 +246,28 @@ public class PluginUtil {
   }
 
   private void manualUpdateConfiguration(Level diffLevel, UpdateStrategies updateStrategies, ConfigurableUpdate update) {
-    if (updateStrategies.isHotpatch()) {
+    if (updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.HOTPATCH)) {
       configureHotpatch(diffLevel, updateStrategies, update);
-    } else if (updateStrategies.isRolling()) {
+    } else if (updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.ROLLING_RESTARTS)) {
       update.enableRolling();
       update.withTimeout(updateStrategies.getSessionDrainTimeout());
-    } else if (updateStrategies.isFullRestart()) {
+    } else if (updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.OFFLINE)) {
       update.enableOffline();
     }
   }
 
   private void configureHotpatch(Level diffLevel, UpdateStrategies updateStrategies, ConfigurableUpdate update) {
     if (diffLevel == Level.ERROR || (diffLevel == Level.WARNING  && !updateStrategies.updateWithWarnings()) || diffLevel == Level.REFACTOR) {
-      if (!updateStrategies.isFullRestart() && !updateStrategies.isRolling())
-        throw new IllegalArgumentException("Only hotpatching selected, but hotpatching not possible!");
-      else if (updateStrategies.isRolling())
+      if (updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.FAIL_BUILD))
+        throw new IllegalArgumentException("Only hotpatching selected, but hotpatching not possible! FAILING BUILD!");
+      else if (updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.ROLLING_RESTARTS) ||
+          updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.LIVEREBEL_DEFAULT)) {
         update.enableRolling();
-      else if (updateStrategies.isFullRestart())
+        update.withTimeout(updateStrategies.getSessionDrainTimeout());
+      }
+      else if (updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.OFFLINE)) {
         update.enableOffline();
+      }
     } else {
       update.withTimeout(updateStrategies.getRequestPauseTimeout());
       update.enableAutoStrategy(updateStrategies.updateWithWarnings());
@@ -254,25 +276,20 @@ public class PluginUtil {
 
 
   DiffResult getDifferences(LiveRebelXml lrXml, String activeVersion) {
-    DiffResult diffResult = getCommandCenter().compare(lrXml.getApplicationId(), activeVersion, lrXml.getVersionId(), false);
-
-    return diffResult;
+    return getCommandCenter().compare(lrXml.getApplicationId(), activeVersion, lrXml.getVersionId(), false);
   }
 
   Set<String> getDeployServers(ApplicationInfo applicationInfo, List<String> selectedServers) {
     Set<String> deployServers = new HashSet<String>();
 
     if (isFirstRelease(applicationInfo)) {
-      logger.log("IS FIRST RELEASE");
       deployServers.addAll(selectedServers);
       return deployServers;
     }
 
     Map<String, String> activeVersions = applicationInfo.getActiveVersionPerServer();
-    logger.log("activeVersions: " + activeVersions);
 
     for (String server : selectedServers) {
-      logger.log("servers: " + server);
       if (!activeVersions.containsKey(server))
         deployServers.add(server);
     }
