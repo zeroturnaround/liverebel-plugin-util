@@ -12,6 +12,13 @@
     server plugins like LiveRebel Jenkins plugin and LiveRebel Bamboo plugin.
   </description>
 
+
+  <scm>
+    <connection>scm:git:git://github.com/zeroturnaround/liverebel-plugin-util.git</connection>
+    <developerConnection>scm:git:git@github.com:zeroturnaround/liverebel-plugin-util.git</developerConnection>
+    <url>http://github.com/zeroturnaround/liverebel-plugin-util</url>
+  </scm>
+
   <distributionManagement>
     <repository>
       <id>zt-public-releases</id>
