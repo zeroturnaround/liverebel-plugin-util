@@ -36,6 +36,9 @@ public class PluginUtil {
   private CommandCenterFactory commandCenterFactory;
   public static final String ARTIFACT_DEPLOYED_AND_UPDATED = "SUCCESS. Artifact deployed and activated in all %d servers: %s\n";
 
+  public final static int DEFAULT_SESSION_DRAIN = 3600;
+  public final static int DEFAULT_REQUEST_PAUSE = 30;
+
   public enum PluginActionResult {
     SUCCESS,
     CONNECTION_ERROR,
@@ -239,16 +242,17 @@ public class PluginUtil {
     if (updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.LIVEREBEL_DEFAULT)) {
       update.enableAutoStrategy(updateStrategies.updateWithWarnings());
     } else {
-      manualUpdateConfiguration(diffLevel, updateStrategies, update);
+      manualUpdateConfiguration(diffLevel, updateStrategies, update, serverIds.size());
     }
     update.on(serverIds);
     update.execute();
   }
 
-  private void manualUpdateConfiguration(Level diffLevel, UpdateStrategies updateStrategies, ConfigurableUpdate update) {
+  private void manualUpdateConfiguration(Level diffLevel, UpdateStrategies updateStrategies, ConfigurableUpdate update, int serversCount) {
     if (updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.HOTPATCH)) {
-      configureHotpatch(diffLevel, updateStrategies, update);
+      configureHotpatch(diffLevel, updateStrategies, update, serversCount);
     } else if (updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.ROLLING_RESTARTS)) {
+      if (serversCount < 2) throw new IllegalArgumentException("Rolling Restart is not possible with less than 2 servers!");
       update.enableRolling();
       update.withTimeout(updateStrategies.getSessionDrainTimeout());
     } else if (updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.OFFLINE)) {
@@ -256,16 +260,17 @@ public class PluginUtil {
     }
   }
 
-  private void configureHotpatch(Level diffLevel, UpdateStrategies updateStrategies, ConfigurableUpdate update) {
+  private void configureHotpatch(Level diffLevel, UpdateStrategies updateStrategies, ConfigurableUpdate update, int serversCount) {
     if (diffLevel == Level.ERROR || (diffLevel == Level.WARNING  && !updateStrategies.updateWithWarnings()) || diffLevel == Level.REFACTOR) {
       if (updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.FAIL_BUILD))
         throw new IllegalArgumentException("Only hotpatching selected, but hotpatching not possible! FAILING BUILD!");
       else if (updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.ROLLING_RESTARTS) ||
-          updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.LIVEREBEL_DEFAULT)) {
+        (updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.LIVEREBEL_DEFAULT) && serversCount > 1)) {
         update.enableRolling();
         update.withTimeout(updateStrategies.getSessionDrainTimeout());
       }
-      else if (updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.OFFLINE)) {
+      else if (updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.OFFLINE) ||
+        (updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.LIVEREBEL_DEFAULT) && serversCount == 1)) {
         update.enableOffline();
       }
     } else {

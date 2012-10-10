@@ -167,6 +167,7 @@ public class PluginUtilTest {
       public Map<String, String> getActiveVersionPerServer() {
         HashMap<String, String> map = Maps.newHashMap();
         map.put("dummy", "ver0");
+        map.put("dummy2", "ver0");
         return map;
       }
 
