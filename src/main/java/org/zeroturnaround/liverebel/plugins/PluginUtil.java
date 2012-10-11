@@ -239,12 +239,13 @@ public class PluginUtil {
     logger.log("Beginning activation of " + lrXml.getApplicationId() + " " + lrXml.getVersionId() + " on servers: " + serverIds);
     ConfigurableUpdate update = getCommandCenter().update(lrXml.getApplicationId(), lrXml.getVersionId());
 
+    update.on(serverIds); //must be BEFORE calling enambleAutoStrategy!!
     if (updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.LIVEREBEL_DEFAULT)) {
       update.enableAutoStrategy(updateStrategies.updateWithWarnings());
     } else {
       manualUpdateConfiguration(diffLevel, updateStrategies, update, serverIds.size());
     }
-    update.on(serverIds);
+
     update.execute();
   }
 
@@ -272,6 +273,7 @@ public class PluginUtil {
       else if (updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.OFFLINE) ||
         (updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.LIVEREBEL_DEFAULT) && serversCount == 1)) {
         update.enableOffline();
+        update.withTimeout(updateStrategies.getRequestPauseTimeout());
       }
     } else {
       update.withTimeout(updateStrategies.getRequestPauseTimeout());
