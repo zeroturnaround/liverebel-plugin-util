@@ -12,10 +12,10 @@ import com.zeroturnaround.liverebel.api.UploadInfo;
 import com.zeroturnaround.liverebel.api.diff.DiffResult;
 import com.zeroturnaround.liverebel.api.diff.Level;
 import com.zeroturnaround.liverebel.api.update.ConfigurableUpdate;
-import com.zeroturnaround.liverebel.util.LiveRebelXml;
-import com.zeroturnaround.liverebel.util.OverrideLiveRebelXmlUtil;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
+import org.zeroturnaround.liverebel.plugins.util.LiveRebelXml;
+import org.zeroturnaround.liverebel.plugins.util.OverrideLiveRebelXmlUtil;
 
 import java.io.File;
 import java.io.IOException;
@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipException;
 
-import static com.zeroturnaround.liverebel.util.OverrideLiveRebelXmlUtil.getLiveRebelXml;
+import static org.zeroturnaround.liverebel.plugins.util.OverrideLiveRebelXmlUtil.getLiveRebelXml;
 
 public class PluginUtil {
   private PluginLogger logger;
