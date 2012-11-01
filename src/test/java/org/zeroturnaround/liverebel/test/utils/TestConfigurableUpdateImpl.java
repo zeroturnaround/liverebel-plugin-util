@@ -1,7 +1,5 @@
 package org.zeroturnaround.liverebel.test.utils;
 
-import com.zeroturnaround.liverebel.api.impl.JsonParser;
-import com.zeroturnaround.liverebel.api.impl.RestConnection;
 import com.zeroturnaround.liverebel.api.update.ConfigurableUpdate;
 import com.zeroturnaround.liverebel.api.update.PausedUpdate;
 import com.zeroturnaround.liverebel.api.update.PausingUpdate;
@@ -11,12 +9,9 @@ import java.io.File;
 import java.util.Collection;
 
 public class TestConfigurableUpdateImpl implements ConfigurableUpdate {
-  
-  public Collection<String> serverIds;
-  public Collection<String> groupNames;
-  public Integer timeoutSeconds;
+
   public String updateMode = "HOTPATCH";
-  public boolean executeScripts;
+
   public ConfigurableUpdate on(String serverId) {
     return this;
   }

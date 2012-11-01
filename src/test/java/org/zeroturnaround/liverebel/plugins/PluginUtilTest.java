@@ -7,6 +7,7 @@ import com.zeroturnaround.liverebel.api.ApplicationInfo;
 import com.zeroturnaround.liverebel.api.CommandCenter;
 import com.zeroturnaround.liverebel.api.CommandCenterFactory;
 import com.zeroturnaround.liverebel.api.LocalInfo;
+import com.zeroturnaround.liverebel.api.ServerInfo;
 import com.zeroturnaround.liverebel.api.UploadInfo;
 import com.zeroturnaround.liverebel.api.VersionInfo;
 import com.zeroturnaround.liverebel.api.diff.DiffResult;
@@ -15,7 +16,9 @@ import org.junit.Test;
 import org.mockito.Mockito;
 import org.zeroturnaround.liverebel.plugins.util.LiveRebelXml;
 import org.zeroturnaround.liverebel.test.utils.TestConfigurableUpdateImpl;
+import org.zeroturnaround.liverebel.test.utils.TestLocalInfoImpl;
 import org.zeroturnaround.liverebel.test.utils.TestPluginLogger;
+import org.zeroturnaround.liverebel.test.utils.TestServerInfoImpl;
 import org.zeroturnaround.liverebel.test.utils.TestUpdateStrategiesImpl;
 
 import java.io.File;
@@ -36,30 +39,26 @@ import static org.mockito.Mockito.verify;
 
 public class PluginUtilTest {
   private static final File archivesDir = new File(PluginUtilTest.class.getResource("archives").getFile());
+  private static final Map<String, ServerInfo> mockedServers = createMockedServer();
+
+  private static Map<String, ServerInfo> createMockedServer() {
+    Map<String, ServerInfo> mockedServers = new HashMap<String, ServerInfo>();
+    mockedServers.put("dummy", new TestServerInfoImpl("dummy"));
+    mockedServers.put("dummy2", new TestServerInfoImpl("dummy2"));
+    return mockedServers;  //To change body of created methods use File | Settings | File Templates.
+  }
 
   @Test
   public void testDefaultUpdate() {
-    UpdateStrategies defaultUpdateStrategies = new TestUpdateStrategiesImpl(UpdateMode.LIVEREBEL_DEFAULT, UpdateMode.LIVEREBEL_DEFAULT, 30, true, 30);
     CommandCenterFactory commandCenterFactory = Mockito.mock(CommandCenterFactory.class);
-    CommandCenter commandCenter = Mockito.mock(CommandCenter.class);
-    Mockito.when(commandCenterFactory.newCommandCenter()).thenReturn(commandCenter);
-    Mockito.when(commandCenter.getApplication("lr-demo")).thenReturn(createDummyApplicationInfo("lr-demo"));
-    Mockito.when(commandCenter.upload(new File(archivesDir, "lr-demo-ver1.war"))).thenReturn(createDummyUploadInfo());
-
-    TestConfigurableUpdateImpl testConfigurableUpdateSpy = spy(new TestConfigurableUpdateImpl());
-    Mockito.when(commandCenter.update((String) any(), (String) any())).thenReturn(testConfigurableUpdateSpy);
-
-    PluginUtil pluginUtil = new PluginUtil(commandCenterFactory, new TestPluginLogger());
-    PluginUtil pluginUtilSpy = spy(pluginUtil);
-    DiffResult diffResult = mock(DiffResult.class);
-    Mockito.when(diffResult.getMaxLevel()).thenReturn(Level.INFO);
-    doReturn(diffResult).when(pluginUtilSpy).getDifferences((LiveRebelXml)any(), anyString());
-    pluginUtilSpy.initCommandCenter(commandCenterFactory);
+    CommandCenter commandCenter = mockCC(commandCenterFactory);
+    TestConfigurableUpdateImpl testConfigurableUpdateSpy = spyConfigurableUpdate(commandCenter);
+    PluginUtil pluginUtilSpy = spyPluginUtil(commandCenterFactory);
 
     PluginConf conf = new PluginConf(PluginConf.Action.DEPLOY_OR_UPDATE);
     conf.deployable = new File(archivesDir, "lr-demo-ver1.war");
     conf.contextPath = "testDefaultUpdate";
-    conf.updateStrategies = defaultUpdateStrategies;
+    conf.updateStrategies = new TestUpdateStrategiesImpl(UpdateMode.LIVEREBEL_DEFAULT, UpdateMode.LIVEREBEL_DEFAULT, 30, true, 30);
     conf.serverIds = Lists.newArrayList("dummy");
 
     assertEquals(PluginUtil.PluginActionResult.SUCCESS, pluginUtilSpy.perform(conf));
@@ -69,29 +68,33 @@ public class PluginUtilTest {
     verify(testConfigurableUpdateSpy).enableAutoStrategy(true);
   }
 
-  @Test
-  public void testRolling() {
-    UpdateStrategies defaultUpdateStrategies = new TestUpdateStrategiesImpl(UpdateMode.ROLLING_RESTARTS, UpdateMode.LIVEREBEL_DEFAULT, 30, true, 30);
-    CommandCenterFactory commandCenterFactory = Mockito.mock(CommandCenterFactory.class);
+  private TestConfigurableUpdateImpl spyConfigurableUpdate(CommandCenter commandCenter) {
+    TestConfigurableUpdateImpl testConfigurableUpdateSpy = spy(new TestConfigurableUpdateImpl());
+    Mockito.when(commandCenter.update((String) any(), (String) any())).thenReturn(testConfigurableUpdateSpy);
+    return testConfigurableUpdateSpy;
+  }
+
+  private CommandCenter mockCC(CommandCenterFactory commandCenterFactory) {
     CommandCenter commandCenter = Mockito.mock(CommandCenter.class);
     Mockito.when(commandCenterFactory.newCommandCenter()).thenReturn(commandCenter);
     Mockito.when(commandCenter.getApplication("lr-demo")).thenReturn(createDummyApplicationInfo("lr-demo"));
+    Mockito.when(commandCenter.getServers()).thenReturn(mockedServers);
     Mockito.when(commandCenter.upload(new File(archivesDir, "lr-demo-ver1.war"))).thenReturn(createDummyUploadInfo());
+    return commandCenter;
+  }
 
+  @Test
+  public void testRolling() {
+    CommandCenterFactory commandCenterFactory = Mockito.mock(CommandCenterFactory.class);
+    CommandCenter commandCenter = mockCC(commandCenterFactory);
     TestConfigurableUpdateImpl testConfigurableUpdateSpy = spy(new TestConfigurableUpdateImpl());
     Mockito.when(commandCenter.update(anyString(), anyString())).thenReturn(testConfigurableUpdateSpy);
-
-    PluginUtil pluginUtil = new PluginUtil(commandCenterFactory, new TestPluginLogger());
-    PluginUtil pluginUtilSpy =  spy(pluginUtil);
-    DiffResult diffResult = mock(DiffResult.class);
-    Mockito.when(diffResult.getMaxLevel()).thenReturn(Level.INFO);
-    doReturn(diffResult).when(pluginUtilSpy).getDifferences((LiveRebelXml)any(), anyString());
-    pluginUtilSpy.initCommandCenter(commandCenterFactory);
+    PluginUtil pluginUtilSpy = spyPluginUtil(commandCenterFactory);
 
     PluginConf conf = new PluginConf(PluginConf.Action.DEPLOY_OR_UPDATE);
     conf.deployable = new File(archivesDir, "lr-demo-ver1.war");
     conf.contextPath = "testRolling";
-    conf.updateStrategies = defaultUpdateStrategies;
+    conf.updateStrategies = new TestUpdateStrategiesImpl(UpdateMode.ROLLING_RESTARTS, UpdateMode.LIVEREBEL_DEFAULT, 30, true, 30);
     conf.serverIds = Lists.newArrayList("dummy", "dummy2");
 
     assertEquals(PluginUtil.PluginActionResult.SUCCESS, pluginUtilSpy.perform(conf));
@@ -101,29 +104,28 @@ public class PluginUtilTest {
     verify(testConfigurableUpdateSpy).enableRolling();
   }
 
-  @Test
-  public void testOffline() {
-    UpdateStrategies defaultUpdateStrategies = new TestUpdateStrategiesImpl(UpdateMode.OFFLINE, UpdateMode.LIVEREBEL_DEFAULT, 30, true, 30);
-    CommandCenterFactory commandCenterFactory = Mockito.mock(CommandCenterFactory.class);
-    CommandCenter commandCenter = Mockito.mock(CommandCenter.class);
-    Mockito.when(commandCenterFactory.newCommandCenter()).thenReturn(commandCenter);
-    Mockito.when(commandCenter.getApplication("lr-demo")).thenReturn(createDummyApplicationInfo("lr-demo"));
-    Mockito.when(commandCenter.upload(new File(archivesDir, "lr-demo-ver1.war"))).thenReturn(createDummyUploadInfo());
-
-    TestConfigurableUpdateImpl testConfigurableUpdateSpy = spy(new TestConfigurableUpdateImpl());
-    Mockito.when(commandCenter.update(anyString(), anyString())).thenReturn(testConfigurableUpdateSpy);
-
+  private PluginUtil spyPluginUtil(CommandCenterFactory commandCenterFactory) {
     PluginUtil pluginUtil = new PluginUtil(commandCenterFactory, new TestPluginLogger());
-    PluginUtil pluginUtilSpy = spy(pluginUtil);
+    PluginUtil pluginUtilSpy =  spy(pluginUtil);
     DiffResult diffResult = mock(DiffResult.class);
     Mockito.when(diffResult.getMaxLevel()).thenReturn(Level.INFO);
     doReturn(diffResult).when(pluginUtilSpy).getDifferences((LiveRebelXml)any(), anyString());
     pluginUtilSpy.initCommandCenter(commandCenterFactory);
+    return pluginUtilSpy;
+  }
+
+  @Test
+  public void testOffline() {
+    CommandCenterFactory commandCenterFactory = Mockito.mock(CommandCenterFactory.class);
+    CommandCenter commandCenter = mockCC(commandCenterFactory);
+    TestConfigurableUpdateImpl testConfigurableUpdateSpy = spy(new TestConfigurableUpdateImpl());
+    Mockito.when(commandCenter.update(anyString(), anyString())).thenReturn(testConfigurableUpdateSpy);
+    PluginUtil pluginUtilSpy = spyPluginUtil(commandCenterFactory);
 
     PluginConf conf = new PluginConf(PluginConf.Action.DEPLOY_OR_UPDATE);
     conf.deployable = new File(archivesDir, "lr-demo-ver1.war");
     conf.contextPath = "testOffline";
-    conf.updateStrategies = defaultUpdateStrategies;
+    conf.updateStrategies = new TestUpdateStrategiesImpl(UpdateMode.OFFLINE, UpdateMode.LIVEREBEL_DEFAULT, 30, true, 30);
     conf.serverIds = Lists.newArrayList("dummy");
 
     assertEquals(PluginUtil.PluginActionResult.SUCCESS, pluginUtilSpy.perform(conf));
@@ -164,18 +166,18 @@ public class PluginUtilTest {
       }
 
       public Map<String, String> getActiveVersionPerServer() {
-        HashMap<String, String> map = Maps.newHashMap();
-        map.put("dummy", "ver0");
-        map.put("dummy2", "ver0");
-        return map;
+        return null;
       }
 
       public List<LocalInfo> getLocalInfos() {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        return null;
       }
 
       public Map<String, LocalInfo> getLocalInfosMap() {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        HashMap<String, LocalInfo> map = Maps.newHashMap();
+        map.put("dummy", new TestLocalInfoImpl("dummy", "ver0"));
+        map.put("dummy2", new TestLocalInfoImpl("dummy", "ver0"));
+        return map;
       }
 
       public Set<String> getUrls() {
