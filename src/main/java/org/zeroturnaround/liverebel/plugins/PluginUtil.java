@@ -1,14 +1,6 @@
 package org.zeroturnaround.liverebel.plugins;
 
-import com.zeroturnaround.liverebel.api.ApplicationInfo;
-import com.zeroturnaround.liverebel.api.CommandCenter;
-import com.zeroturnaround.liverebel.api.CommandCenterFactory;
-import com.zeroturnaround.liverebel.api.Conflict;
-import com.zeroturnaround.liverebel.api.ConnectException;
-import com.zeroturnaround.liverebel.api.DuplicationException;
-import com.zeroturnaround.liverebel.api.Forbidden;
-import com.zeroturnaround.liverebel.api.ParseException;
-import com.zeroturnaround.liverebel.api.UploadInfo;
+import com.zeroturnaround.liverebel.api.*;
 import com.zeroturnaround.liverebel.api.diff.DiffResult;
 import com.zeroturnaround.liverebel.api.diff.Level;
 import com.zeroturnaround.liverebel.api.update.ConfigurableUpdate;
@@ -22,6 +14,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +46,6 @@ public class PluginUtil {
 
   public PluginActionResult perform(PluginConf conf) {
     if (!initCommandCenter(commandCenterFactory) || this.commandCenter == null) {
-      logger.log("ERROR! Failed to connect to Command Center, please configure connection parameters!");
       return PluginActionResult.CONNECTION_ERROR;
     }
     boolean tempFileCreated = false;
@@ -125,7 +118,7 @@ public class PluginUtil {
         deployOrUpdate(conf);
         break;
       case UNDEPLOY:
-        undeploy(conf.undeployId, conf.serverIds);
+        undeploy(conf.undeployId, getServers(conf.serverIds));
         break;
     }
   }
@@ -134,8 +127,23 @@ public class PluginUtil {
     upload(conf);
     LiveRebelXml lrXml = getLiveRebelXml(conf.deployable);
     ApplicationInfo applicationInfo = getCommandCenter().getApplication(lrXml.getApplicationId());
-    update(lrXml, applicationInfo, conf.serverIds, conf.contextPath, conf.updateStrategies);
+
+    update(lrXml, applicationInfo, getServers(conf.serverIds), conf.contextPath, conf.updateStrategies);
     logger.log(String.format(ARTIFACT_DEPLOYED_AND_UPDATED, conf.serverIds.size(), conf.deployable));
+  }
+
+  private List<Server> getServers(List<String> serverIds) {
+    Map<String, ServerInfo> existingServers = getCommandCenter().getServers();
+    List<Server> servers = new ArrayList<Server>();
+    for (String serverId : serverIds) {
+      ServerInfo serverinfo = existingServers.get(serverId);
+      if (existingServers.containsKey(serverId) && serverinfo.isConnected()) {
+        servers.add(new ServerImpl(serverId, serverinfo.getName(),"", 0, false, serverinfo.isConnected(), false));
+      } else {
+        logger.error("WARNING! Unknown or offline server with id: " + serverId);
+      }
+    }
+    return servers;
   }
 
   private void upload(PluginConf conf) throws IOException, InterruptedException {
@@ -155,12 +163,12 @@ public class PluginUtil {
     }
   }
 
-  private void undeploy(String applicationId, List<String> selectedServers) {
+  private void undeploy(String applicationId, List<Server> selectedServers) {
     logger.log(String.format("Undeploying application %s on %s.\n", applicationId, selectedServers));
     if (selectedServers.isEmpty()) {
       throw new IllegalArgumentException("Undeploy selected with no online servers!");
     }
-    commandCenter.undeploy(applicationId, selectedServers);
+    commandCenter.undeploy(applicationId, toIds(selectedServers));
     logger.log(String.format("SUCCESS: Application undeploying from %s.\n", selectedServers));
   }
 
@@ -187,7 +195,7 @@ public class PluginUtil {
     }
     catch (Forbidden e) {
       logger.log(
-        "ERROR! Access denied. Please, navigate to Plugin Configuration to specify LiveRebel Authentication Token.");
+        "ERROR! Access denied. Please, navigate to Plugin Configuration to specify right LiveRebel Authentication Token.");
       return false;
     }
     catch (ConnectException e) {
@@ -204,20 +212,20 @@ public class PluginUtil {
     }
   }
 
-  void update(LiveRebelXml lrXml, ApplicationInfo applicationInfo, List<String> selectedServers, String contextPath, UpdateStrategies updateStrategies) throws IOException,
+  void update(LiveRebelXml lrXml, ApplicationInfo applicationInfo, List<Server> selectedServers, String contextPath, UpdateStrategies updateStrategies) throws IOException,
     InterruptedException {
 
     if (selectedServers.isEmpty())
       throw new IllegalArgumentException("Deploy or update artifact was selected without any servers!");
 
-    Set<String> deployServers = getDeployServers(applicationInfo, selectedServers);
+    Set<Server> deployServers = getDeployServers(applicationInfo, selectedServers);
     logger.log("Starting updating application on servers: " + deployServers.toString());
     if (!deployServers.isEmpty()) {
       deploy(lrXml, deployServers, contextPath);
     }
 
     if (deployServers.size() != selectedServers.size()) {
-      Set<String> activateServers = new HashSet<String>(selectedServers);
+      Set<Server> activateServers = new HashSet<Server>(selectedServers);
       activateServers.removeAll(deployServers);
 
       Level diffLevel = getMaxDifferenceLevel(applicationInfo, lrXml, activateServers);
@@ -226,24 +234,32 @@ public class PluginUtil {
     }
   }
 
-  void deploy(LiveRebelXml lrXml, Set<String> serverIds, String contextPath) {
-    logger.log(String.format("Deploying new application on %s.\n", serverIds));
+  void deploy(LiveRebelXml lrXml, Set<Server> servers, String contextPath) {
+    logger.log(String.format("Deploying new application on %s.\n", servers));
     if (contextPath == null || contextPath.equals(""))
       contextPath = null;
-    getCommandCenter().deploy(lrXml.getApplicationId(), lrXml.getVersionId(), contextPath, serverIds);
-    logger.log(String.format("SUCCESS: Application deployed to %s.\n", serverIds));
+    getCommandCenter().deploy(lrXml.getApplicationId(), lrXml.getVersionId(), contextPath, toIds(servers));
+    logger.log(String.format("SUCCESS: Application deployed to %s.\n", servers));
   }
 
-  void activate(LiveRebelXml lrXml, Set<String> serverIds, Level diffLevel, UpdateStrategies updateStrategies) throws IOException,
+  private Collection<String> toIds(Collection<Server> servers) {
+    Collection<String> serverIds = new HashSet<String>();
+    for (Server server : servers) {
+      serverIds.add(server.getId());
+    }
+    return serverIds;
+  }
+
+  void activate(LiveRebelXml lrXml, Set<Server> servers, Level diffLevel, UpdateStrategies updateStrategies) throws IOException,
     InterruptedException {
-    logger.log("Beginning activation of " + lrXml.getApplicationId() + " " + lrXml.getVersionId() + " on servers: " + serverIds);
+    logger.log("Beginning activation of " + lrXml.getApplicationId() + " " + lrXml.getVersionId() + " on servers: " + servers);
     ConfigurableUpdate update = getCommandCenter().update(lrXml.getApplicationId(), lrXml.getVersionId());
 
-    update.on(serverIds); //must be BEFORE calling enambleAutoStrategy!!
+    update.on(toIds(servers)); //must be BEFORE calling enambleAutoStrategy!!
     if (updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.LIVEREBEL_DEFAULT)) {
       update.enableAutoStrategy(updateStrategies.updateWithWarnings());
     } else {
-      manualUpdateConfiguration(diffLevel, updateStrategies, update, serverIds.size());
+      manualUpdateConfiguration(diffLevel, updateStrategies, update, servers.size());
     }
 
     update.execute();
@@ -286,18 +302,18 @@ public class PluginUtil {
     return getCommandCenter().compare(lrXml.getApplicationId(), activeVersion, lrXml.getVersionId(), false);
   }
 
-  Set<String> getDeployServers(ApplicationInfo applicationInfo, List<String> selectedServers) {
-    Set<String> deployServers = new HashSet<String>();
+  Set<Server> getDeployServers(ApplicationInfo applicationInfo, List<Server> selectedServers) {
+    Set<Server> deployServers = new HashSet<Server>();
 
     if (isFirstRelease(applicationInfo)) {
       deployServers.addAll(selectedServers);
       return deployServers;
     }
 
-    Map<String, String> activeVersions = applicationInfo.getActiveVersionPerServer();
+    Map<String, LocalInfo> activeVersions = applicationInfo.getLocalInfosMap();
 
-    for (String server : selectedServers) {
-      if (!activeVersions.containsKey(server))
+    for (Server server : selectedServers) {
+      if (!activeVersions.containsKey(server.getId()))
         deployServers.add(server);
     }
     return deployServers;
@@ -307,17 +323,17 @@ public class PluginUtil {
     return applicationInfo == null;
   }
 
-  private Level getMaxDifferenceLevel(ApplicationInfo applicationInfo, LiveRebelXml lrXml, Set<String> serversToUpdate) {
-    Map<String, String> activeVersions = applicationInfo.getActiveVersionPerServer();
+  private Level getMaxDifferenceLevel(ApplicationInfo applicationInfo, LiveRebelXml lrXml, Set<Server> serversToUpdate) {
+    Map<String, LocalInfo> activeVersions = applicationInfo.getLocalInfosMap();
     Level diffLevel = Level.NOP;
     String versionToUpdateTo = lrXml.getVersionId();
     int serversWithSameVersion = 0;
-    for (Map.Entry<String, String> entry : activeVersions.entrySet()) {
+    for (Map.Entry<String, LocalInfo> entry : activeVersions.entrySet()) {
       String server = entry.getKey();
       if (!serversToUpdate.contains(server)) {
         continue;
       }
-      String versionInServer = entry.getValue();
+      String versionInServer = entry.getValue().getVersionId();
       if (StringUtils.equals(versionToUpdateTo, versionInServer)) {
         serversWithSameVersion++;
         serversToUpdate.remove(server);

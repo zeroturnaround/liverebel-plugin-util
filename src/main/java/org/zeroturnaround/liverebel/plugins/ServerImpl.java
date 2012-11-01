@@ -86,7 +86,7 @@ public class ServerImpl implements Server {
 
   @Override
   public String toString() {
-    return "{ ID="+id+" GROUP_NAME="+getTitle()+" checked="+isChecked()+" isGroup="+isGroup() + " connected="+isConnected() + " parentNames="+parentNames+" }";
+    return getTitle();
   }
 
 
