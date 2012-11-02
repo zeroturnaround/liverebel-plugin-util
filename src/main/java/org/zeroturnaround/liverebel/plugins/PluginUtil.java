@@ -62,6 +62,9 @@ public class PluginUtil {
     catch (IllegalArgumentException e) {
       logger.log("ERROR: " + e.getMessage());
     }
+    catch (IllegalStateException e) {
+      logger.log("ERROR: " + e.getMessage());
+    }
     catch (com.zeroturnaround.liverebel.api.Error e) {
       logger.log("ERROR! Unexpected error received from server.");
       logger.log("");
@@ -361,6 +364,8 @@ public class PluginUtil {
   }
 
   public CommandCenter getCommandCenter() {
+    if (commandCenter == null && !initCommandCenter(commandCenterFactory))
+      throw new IllegalStateException("Could not connect to Command Center!");
     return commandCenter;
   }
 

@@ -75,7 +75,7 @@ public class OverrideLiveRebelXmlUtil {
       // maybe it is an EAR file?
       fileEntry = ZipUtil.unpackEntry(file, "liverebel.xml");
       if (fileEntry == null) {
-        return null;
+        throw new IllegalStateException("No liverebel.xml found in the archive " + file + " !");
       }
     }
     return LiveRebelXml.parse(fileEntry);
