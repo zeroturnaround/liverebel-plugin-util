@@ -1,14 +1,5 @@
 package org.zeroturnaround.liverebel.plugins;
 
-import com.zeroturnaround.liverebel.api.*;
-import com.zeroturnaround.liverebel.api.diff.DiffResult;
-import com.zeroturnaround.liverebel.api.diff.Level;
-import com.zeroturnaround.liverebel.api.update.ConfigurableUpdate;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.StringUtils;
-import org.zeroturnaround.liverebel.plugins.util.LiveRebelXml;
-import org.zeroturnaround.liverebel.plugins.util.OverrideLiveRebelXmlUtil;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -21,6 +12,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipException;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
+import org.zeroturnaround.liverebel.plugins.util.LiveRebelXml;
+import org.zeroturnaround.liverebel.plugins.util.OverrideLiveRebelXmlUtil;
+import com.zeroturnaround.liverebel.api.*;
+import com.zeroturnaround.liverebel.api.diff.DiffResult;
+import com.zeroturnaround.liverebel.api.diff.Level;
+import com.zeroturnaround.liverebel.api.update.ConfigurableUpdate;
 
 import static org.zeroturnaround.liverebel.plugins.util.OverrideLiveRebelXmlUtil.getLiveRebelXml;
 
@@ -222,8 +221,8 @@ public class PluginUtil {
       throw new IllegalArgumentException("Deploy or update artifact was selected without any servers!");
 
     Set<Server> deployServers = getDeployServers(applicationInfo, selectedServers);
-    logger.log("Starting updating application on servers: " + deployServers.toString());
     if (!deployServers.isEmpty()) {
+      logger.log("Starting deploying application on servers: " + deployServers.toString());
       deploy(lrXml, deployServers, contextPath);
     }
 
