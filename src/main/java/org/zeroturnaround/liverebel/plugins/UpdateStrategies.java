@@ -30,4 +30,9 @@ public interface UpdateStrategies {
    */
   int getRequestPauseTimeout();
 
+  /**
+   * @return the request pause timeout in seconds when using Offline update
+   */
+  int getConnectionPauseTimeout();
+
 }

@@ -276,6 +276,7 @@ public class PluginUtil {
       update.withTimeout(updateStrategies.getSessionDrainTimeout());
     } else if (updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.OFFLINE)) {
       update.enableOffline();
+      update.withTimeout(updateStrategies.getConnectionPauseTimeout());
     }
   }
 
@@ -291,7 +292,7 @@ public class PluginUtil {
       else if (updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.OFFLINE) ||
         (updateStrategies.getFallbackUpdateStrategy().equals(UpdateMode.LIVEREBEL_DEFAULT) && serversCount == 1)) {
         update.enableOffline();
-        update.withTimeout(updateStrategies.getRequestPauseTimeout());
+        update.withTimeout(updateStrategies.getConnectionPauseTimeout());
       }
     } else {
       update.withTimeout(updateStrategies.getRequestPauseTimeout());
