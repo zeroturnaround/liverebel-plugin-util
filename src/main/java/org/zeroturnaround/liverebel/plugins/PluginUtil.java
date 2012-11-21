@@ -222,7 +222,6 @@ public class PluginUtil {
 
     Set<Server> deployServers = getDeployServers(applicationInfo, selectedServers);
     if (!deployServers.isEmpty()) {
-      logger.log("Starting deploying application on servers: " + deployServers.toString());
       deploy(lrXml, deployServers, contextPath);
     }
 
