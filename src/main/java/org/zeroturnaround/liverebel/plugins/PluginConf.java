@@ -8,8 +8,8 @@ public class PluginConf {
     UPLOAD("Upload"),
     DEPLOY_OR_UPDATE("Deploy or Update"),
     UNDEPLOY("Undeploy");
-    private String name;
 
+    private String name;
     private Action(String name) {
       this.name = name;
     }
@@ -32,7 +32,6 @@ public class PluginConf {
   public String contextPath;
   public UpdateStrategies updateStrategies;
   public String undeployId;
-
   public boolean isOverride;
 
   public String overrideApp;
@@ -48,6 +47,22 @@ public class PluginConf {
 
   public void setAction(Action action) {
     this.action = action;
+  }
+
+  @Override
+  public String toString() {
+    return "PluginConf{" +
+        "action=" + action +
+        ", deployable=" + deployable +
+        ", metadata=" + metadata +
+        ", serverIds=" + serverIds +
+        ", contextPath='" + contextPath + '\'' +
+        ", updateStrategies=" + updateStrategies +
+        ", undeployId='" + undeployId + '\'' +
+        ", isOverride=" + isOverride +
+        ", overrideApp='" + overrideApp + '\'' +
+        ", overrideVer='" + overrideVer + '\'' +
+        '}';
   }
 
 
