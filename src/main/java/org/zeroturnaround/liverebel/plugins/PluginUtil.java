@@ -316,7 +316,7 @@ public class PluginUtil {
     Map<String, LocalInfo> activeVersions = applicationInfo.getLocalInfosMap();
 
     for (Server server : selectedServers) {
-      if (!activeVersions.containsKey(server.getId()))
+      if (!activeVersions.containsKey(server.getId()) || activeVersions.get(server.getId()).getVersionId() == null)
         deployServers.add(server);
     }
     return deployServers;
