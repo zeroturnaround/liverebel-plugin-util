@@ -11,6 +11,7 @@ public class TestUpdateStrategiesImpl implements UpdateStrategies {
   public final int requestPause;
   public final boolean updateWithWarnings;
   public final int sessionDrain;
+  public final int connectionPause;
 
   public TestUpdateStrategiesImpl(UpdateMode primary, UpdateMode fallback, int requestPause, boolean updateWithWarnings, int sessionDrain) {
     this.primary = primary;
@@ -18,6 +19,7 @@ public class TestUpdateStrategiesImpl implements UpdateStrategies {
     this.requestPause = requestPause;
     this.updateWithWarnings = updateWithWarnings;
     this.sessionDrain = sessionDrain;
+    this.connectionPause = requestPause;
   }
 
   public UpdateMode getPrimaryUpdateStrategy() {
@@ -38,5 +40,9 @@ public class TestUpdateStrategiesImpl implements UpdateStrategies {
 
   public int getRequestPauseTimeout() {
     return requestPause;
+  }
+
+  public int getConnectionPauseTimeout() {
+    return connectionPause;
   }
 }
