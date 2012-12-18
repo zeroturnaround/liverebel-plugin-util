@@ -46,6 +46,11 @@
       <version>2.5-RC6</version>
     </dependency>
     <dependency>
+      <groupId>com.zeroturnaround</groupId>
+      <artifactId>lr-public-util</artifactId>
+      <version>1.2-SNAPSHOT</version>
+    </dependency>
+    <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
       <version>2.2</version>

@@ -3,6 +3,7 @@ package org.zeroturnaround.liverebel.plugins.util;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import org.zeroturnaround.zip.ZipUtil;
+import com.zeroturnaround.liverebel.util.SanitizeHelper;
 
 public class OverrideLiveRebelXmlUtil {
   public static final String TYPE_JAR = "JAR";
@@ -23,8 +24,8 @@ public class OverrideLiveRebelXmlUtil {
   public static File addLiveRebelXml(File file, LiveRebelXml xml) {
     String destPath = file.getParentFile().getAbsolutePath()
       + "/"
-      + sanitize(xml.getApplicationId() + "-" + xml.getVersionId() + "-"
-      + System.currentTimeMillis());
+      + SanitizeHelper.sanitize(xml.getApplicationId() + "-" + xml.getVersionId() + "-"
+        + System.currentTimeMillis());
     File destFile = new File(destPath);
     byte[] bytes;
     try {
@@ -139,13 +140,5 @@ public class OverrideLiveRebelXmlUtil {
       // JAR then
       return TYPE_JAR;
     }
-  }
-
-  static String sanitize(String input) {
-    StringBuffer sb = new StringBuffer(input);
-    for (int i = 0; i < sb.length(); i++)
-      if (!Character.isLetterOrDigit(sb.charAt(i)))
-        sb.setCharAt(i, '-');
-    return sb.toString();
   }
 }
