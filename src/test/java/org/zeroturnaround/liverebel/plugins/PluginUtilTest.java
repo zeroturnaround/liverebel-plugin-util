@@ -1,5 +1,18 @@
 package org.zeroturnaround.liverebel.plugins;
 
+import java.io.File;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.junit.Test;
+import org.mockito.Mockito;
+import org.zeroturnaround.liverebel.plugins.util.LiveRebelXml;
+import org.zeroturnaround.liverebel.test.utils.TestConfigurableUpdateImpl;
+import org.zeroturnaround.liverebel.test.utils.TestLocalInfoImpl;
+import org.zeroturnaround.liverebel.test.utils.TestPluginLogger;
+import org.zeroturnaround.liverebel.test.utils.TestServerInfoImpl;
+import org.zeroturnaround.liverebel.test.utils.TestUpdateStrategiesImpl;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -12,30 +25,11 @@ import com.zeroturnaround.liverebel.api.UploadInfo;
 import com.zeroturnaround.liverebel.api.VersionInfo;
 import com.zeroturnaround.liverebel.api.diff.DiffResult;
 import com.zeroturnaround.liverebel.api.diff.Level;
-import org.junit.Test;
-import org.mockito.Mockito;
-import org.zeroturnaround.liverebel.plugins.util.LiveRebelXml;
-import org.zeroturnaround.liverebel.test.utils.TestConfigurableUpdateImpl;
-import org.zeroturnaround.liverebel.test.utils.TestLocalInfoImpl;
-import org.zeroturnaround.liverebel.test.utils.TestPluginLogger;
-import org.zeroturnaround.liverebel.test.utils.TestServerInfoImpl;
-import org.zeroturnaround.liverebel.test.utils.TestUpdateStrategiesImpl;
 
-import java.io.File;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 public class PluginUtilTest {
   private static final File archivesDir = new File(PluginUtilTest.class.getResource("archives").getFile());
@@ -181,6 +175,10 @@ public class PluginUtilTest {
       }
 
       public Set<String> getUrls() {
+        return null;
+      }
+
+      public VersionInfo getLatestVersion() {
         return null;
       }
     };

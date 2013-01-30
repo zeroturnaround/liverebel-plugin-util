@@ -35,4 +35,8 @@ public class TestLocalInfoImpl implements LocalInfo {
   public Set<String> getUrls() {
     return null;
   }
+
+  public boolean isDirty() {
+    return false;
+  }
 }

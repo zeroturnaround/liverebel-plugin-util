@@ -1,12 +1,11 @@
 package org.zeroturnaround.liverebel.test.utils;
 
+import java.io.File;
+import java.util.Collection;
 import com.zeroturnaround.liverebel.api.update.ConfigurableUpdate;
 import com.zeroturnaround.liverebel.api.update.PausedUpdate;
 import com.zeroturnaround.liverebel.api.update.PausingUpdate;
 import com.zeroturnaround.liverebel.api.update.RunningUpdate;
-
-import java.io.File;
-import java.util.Collection;
 
 public class TestConfigurableUpdateImpl implements ConfigurableUpdate {
 
@@ -68,6 +67,10 @@ public class TestConfigurableUpdateImpl implements ConfigurableUpdate {
     return this;
   }
 
+  public ConfigurableUpdate setScriptEntriesArchive(File scriptEntriesArchive) {
+    return this;
+  }
+
   public PausedUpdate executeWithPause() {
     return null;
   }
@@ -76,8 +79,9 @@ public class TestConfigurableUpdateImpl implements ConfigurableUpdate {
     return null;
   }
 
-  public void execute() {
+  public Long execute() {
 
+    return 0l;
   }
 
   public RunningUpdate start() {
