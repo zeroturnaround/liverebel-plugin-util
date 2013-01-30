@@ -62,11 +62,19 @@ public class OverrideLiveRebelXmlUtil {
   public static File overrideOrCreateXML(File file, String app, String ver) {
     if (!file.isFile())
       throw new IllegalArgumentException("File not found: " + file.getAbsolutePath());
-    LiveRebelXml initialArchiveXml = getLiveRebelXml(file);
+    LiveRebelXml initialArchiveXml = getLiveRebelXmlOrNull(file);
     if (initialArchiveXml == null) {
       return createLiveRebelXml(file, app, ver);
     } else {
       return overrideLiveRebelXml(file, app, ver, initialArchiveXml);
+    }
+  }
+
+  private static LiveRebelXml getLiveRebelXmlOrNull(File file) {
+    try {
+      return getLiveRebelXml(file);
+    } catch (Exception e) {
+      return null;
     }
   }
 
