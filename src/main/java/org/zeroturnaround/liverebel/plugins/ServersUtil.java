@@ -2,8 +2,12 @@ package org.zeroturnaround.liverebel.plugins;
 
 import com.google.common.collect.Lists;
 import com.zeroturnaround.liverebel.api.CommandCenter;
+import com.zeroturnaround.liverebel.api.SchemaInfo;
+import com.zeroturnaround.liverebel.api.ServerGroup;
+import com.zeroturnaround.liverebel.api.ServerGroupOperations;
 import com.zeroturnaround.liverebel.api.ServerInfo;
-import com.zeroturnaround.liverebel.api.impl.ServerGroup;
+
+import org.zeroturnaround.liverebel.plugins.Server;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,7 +39,9 @@ public class ServersUtil {
       servers.clear();
       for(Server newServer : newServers) {
         if (oldServersMap.containsKey(newServer.getId()))
-          servers.add(new ServerImpl(newServer.getId(), newServer.getTitle(),newServer.getParentNames(), newServer.getIndentDepth(), oldServersMap.get(newServer.getId()).isChecked(), newServer.isConnected(), newServer.isGroup()));
+          servers.add(new ServerImpl(newServer.getId(), newServer.getTitle(), newServer.getParentNames(), newServer.getIndentDepth(),
+              oldServersMap.get(newServer.getId()).isChecked(), newServer.isConnected(), newServer.isGroup(), newServer.getType(),
+              newServer.isVirtualHostsSupported(), newServer.getDefaultVirtualHostName(), newServer.getVirtualHostNames()));
         else
           servers.add(newServer);
       }
@@ -60,7 +66,8 @@ public class ServersUtil {
   public boolean isServerGroupsSupported(String currentVersion) {return !currentVersion.startsWith("2.0");}
 
   public List<Server> showServerGroups(CommandCenter commandCenter) {
-    List<ServerGroup> topLevelServerGroups = commandCenter.getGroups("");
+    ServerGroupOperations sgo = commandCenter.serverGroupOperations();
+    List<ServerGroup> topLevelServerGroups = sgo.getAllGroups();
     List<Server> allCheckBoxes = new ArrayList<Server>();
     for (ServerGroup serverGroup : topLevelServerGroups) {
       if (hasServers(serverGroup).contains(true)) //do not add empty groups
@@ -82,7 +89,7 @@ public class ServersUtil {
   }
 
   public List<Server> processSiblings(ServerGroup serverGroup, String parentNames, int indentDepth) {
-    Server serverCheckbox = new ServerImpl(serverGroup.getName(), serverGroup.getName(), parentNames, indentDepth, false, false, true);
+    Server serverCheckbox = new ServerImpl(serverGroup.getName(), serverGroup.getName(), parentNames, indentDepth, false, false, true, null, false, null, null);
     ArrayList<Server> serverCheckboxes = new ArrayList<Server>();
     serverCheckboxes.add(serverCheckbox);
     if (serverGroup.getChildren().size() != 0) {
@@ -94,7 +101,8 @@ public class ServersUtil {
 
     if (serverGroup.getServers().size() != 0) {
       for (ServerInfo server : serverGroup.getServers()) {
-        serverCheckboxes.add(new ServerImpl(server.getId(), server.getName(), "lr-" + serverGroup.getName().replaceAll("[^A-Za-z0-9]", "_"), indentDepth + 1, false, server.isConnected(), false));
+        serverCheckboxes.add(new ServerImpl(server.getId(), server.getName(), "lr-" + serverGroup.getName().replaceAll("[^A-Za-z0-9]", "_"), indentDepth + 1, false,
+            server.isConnected(), false, server.getType(), server.isVirtualHostsSupported(), server.getDefaultVirtualHostName(), server.getVirtualHostNames()));
       }
     }
 
@@ -104,8 +112,22 @@ public class ServersUtil {
   public List<Server> showServers(CommandCenter commandCenter) {
     List<Server> servers = new ArrayList<Server>();
     for (ServerInfo server : commandCenter.getServers().values()) {
-      servers.add(new ServerImpl(server.getId(), server.getName(), "", 0, false, server.isConnected(), false));
+      servers.add(new ServerImpl(server.getId(), server.getName(), "", 0, false, server.isConnected(), false,
+          server.getType(), server.isVirtualHostsSupported(), server.getDefaultVirtualHostName(), server.getVirtualHostNames()));
     }
     return servers;
   }
+
+  public List<SchemaInfo> getSchemas() {
+    if (commandCenter == null)
+      return null;
+    Map<Long, SchemaInfo> schemaMap = commandCenter.getAllDatabaseSchemas();
+    List<SchemaInfo> schemas = new ArrayList<SchemaInfo>();
+    for (SchemaInfo schemaInfo : schemaMap.values()) {
+      schemas.add(schemaInfo);
+    }
+
+    return schemas;
+  }
+
 }

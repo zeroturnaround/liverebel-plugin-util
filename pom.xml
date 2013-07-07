@@ -32,23 +32,58 @@
     </snapshotRepository>
   </distributionManagement>
 
+  <repositories>
+    <repository>
+      <releases>
+        <enabled>true</enabled>
+        <updatePolicy>always</updatePolicy>
+        <checksumPolicy>warn</checksumPolicy>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <id>zt-public-releases</id>
+      <name>ZeroTurnaround Public Releases</name>
+      <url>dav:http://repos.zeroturnaround.com/nexus/content/repositories/zt-public-releases</url>
+      <layout>default</layout>
+    </repository>
+    <repository>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+        <updatePolicy>always</updatePolicy>
+        <checksumPolicy>warn</checksumPolicy>
+      </snapshots>
+      <id>zt-public-snapshots</id>
+      <name>ZeroTurnaround Public Snapshots</name>
+      <url>dav:http://repos.zeroturnaround.com/nexus/content/repositories/zt-public-snapshots</url>
+      <layout>default</layout>
+    </repository>
+  </repositories>
+
   <developers>
     <developer>
       <id>poolik</id>
       <name>Tõnis Pool</name>
     </developer>
+    <developer>
+      <id>glebsts</id>
+      <name>Gleb Stsenov</name>
+    </developer>
   </developers>
 
   <dependencies>
     <dependency>
-      <groupId>com.zeroturnaround</groupId>
+      <groupId>com.zeroturnaround.liverebel</groupId>
       <artifactId>lr-api</artifactId>
-      <version>2.5.10</version>
+      <version>2.7.5</version>
     </dependency>
     <dependency>
-      <groupId>com.zeroturnaround</groupId>
+      <groupId>com.zeroturnaround.liverebel</groupId>
       <artifactId>lr-public-util</artifactId>
-      <version>1.2</version>
+      <version>2.7.5</version>
     </dependency>
     <dependency>
       <groupId>commons-io</groupId>

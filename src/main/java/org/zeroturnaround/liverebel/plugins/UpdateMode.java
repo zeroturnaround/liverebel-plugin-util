@@ -5,7 +5,8 @@ public enum UpdateMode {
   ROLLING_RESTARTS ("Rolling Restarts", "ROLLING_RESTARTS"),
   OFFLINE ("Full restart", "OFFLINE"),
   FAIL_BUILD ("Fail the build", "FAIL_BUILD"),
-  LIVEREBEL_DEFAULT ("LiveRebel default", "LIVEREBEL_DEFAULT");
+  LIVEREBEL_DEFAULT("LiveRebel default", "LIVEREBEL_DEFAULT"),
+  ALL_AT_ONCE_UPDATE("All-at-once update", "ALL_AT_ONCE_UPDATE");
 
   private UpdateMode(String name, String value) {
     this.name = name;

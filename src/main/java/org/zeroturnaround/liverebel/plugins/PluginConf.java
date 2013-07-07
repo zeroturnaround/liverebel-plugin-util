@@ -37,6 +37,15 @@ public class PluginConf {
   public String overrideApp;
   public String overrideVer;
 
+  public boolean hasStaticContent;
+  public boolean hasDatabaseMigrations;
+  public String virtualHostName;
+  public String destinationFileName;
+  public String filePath;
+  public String schemaId;
+  public String targetProxyId;
+  public List<String> staticServerIds;
+
   public Action getAction() {
     return action;
   }
@@ -62,6 +71,14 @@ public class PluginConf {
         ", isOverride=" + isOverride +
         ", overrideApp='" + overrideApp + '\'' +
         ", overrideVer='" + overrideVer + '\'' +
+        ", destinationFileName='" + destinationFileName + '\'' +
+        ", hasDatabaseMigrations=" + hasDatabaseMigrations +
+        ", schemaId='" + schemaId + '\'' +
+        ", targetProxyId='" + targetProxyId + '\'' +
+        ", virtualHostName='" + virtualHostName + '\'' +
+        ", hasDatabaseMigrations=" + hasDatabaseMigrations +
+        ", staticServerIds=" + staticServerIds +
+        ", filePath='" + filePath + '\'' +
         '}';
   }
 

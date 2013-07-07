@@ -25,11 +25,16 @@ public class PluginConfVerifier {
       throw new IllegalArgumentException("Undeployable application ID must be given!");
     }
     verifyServers(conf);
+    verifySchema(conf);
+    verifyStaticContentServers(conf);
   }
 
   private static void verifyDeployOrUpdateConf(PluginConf conf) {
     verifyUploadConf(conf);
     verifyServers(conf);
+    verifySchema(conf);
+    verifyStaticContentServers(conf);
+    verifyStaticContentFilePath(conf);
     verifyUpdateStrategies(conf);
   }
 
@@ -56,6 +61,28 @@ public class PluginConfVerifier {
   private static void verifyServers(PluginConf conf) {
     if (conf.serverIds == null || conf.serverIds.isEmpty()) {
       throw new IllegalArgumentException("No servers specified for " + conf.getAction());
+    }
+  }
+
+  private static void verifySchema(PluginConf conf) {
+    if (conf.hasDatabaseMigrations && trimToNull(conf.schemaId) == null) {
+      throw new IllegalArgumentException("Migrations selected, but no schema specified!");
+    }
+  }
+
+  private static void verifyStaticContentServers(PluginConf conf) {
+    if (conf.hasStaticContent && (conf.staticServerIds == null || conf.staticServerIds.isEmpty())) {
+      throw new IllegalArgumentException("Static content selected, but no servers for static content specified");
+    }
+
+    if (conf.hasStaticContent && (conf.serverIds == null || conf.serverIds.isEmpty())) {
+      throw new IllegalArgumentException("Static content selected, but no app servers specified");
+    }
+  }
+
+  private static void verifyStaticContentFilePath(PluginConf conf) {
+    if (conf.hasStaticContent && trimToNull(conf.filePath) == null) {
+      throw new IllegalArgumentException("Static content selected, but no path for unpacking specified");
     }
   }
 

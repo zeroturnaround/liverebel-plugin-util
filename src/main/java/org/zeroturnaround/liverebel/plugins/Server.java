@@ -1,5 +1,9 @@
 package org.zeroturnaround.liverebel.plugins;
 
+import java.util.Set;
+
+import com.zeroturnaround.liverebel.util.ServerKind;
+
 public interface Server {
 
   public String getTitle();
@@ -47,4 +51,15 @@ public interface Server {
 
 
   public int getIndentDepth();
+
+  /**
+   * @return return server type from LR CC
+   */
+  public ServerKind getType();
+
+  public Set<String> getVirtualHostNames();
+
+  public String getDefaultVirtualHostName();
+
+  public boolean isVirtualHostsSupported();
 }

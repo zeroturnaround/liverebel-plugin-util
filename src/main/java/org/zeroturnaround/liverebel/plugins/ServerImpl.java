@@ -1,6 +1,10 @@
 package org.zeroturnaround.liverebel.plugins;
 
+import java.util.Set;
+
 import org.apache.commons.lang.StringUtils;
+
+import com.zeroturnaround.liverebel.util.ServerKind;
 
 public class ServerImpl implements Server {
   private String title;
@@ -14,7 +18,14 @@ public class ServerImpl implements Server {
   private boolean connected;
   private final boolean isGroup;
 
-  public ServerImpl(String id, String title, String parentNames, int indentDepth, boolean selected, boolean connected, boolean isGroup) {
+  private final ServerKind type;
+
+  private final Set<String> virtualHostNames;
+  private final String defaultVirtualHostName;
+  private final boolean virtualHostsSupported;
+
+  public ServerImpl(String id, String title, String parentNames, int indentDepth, boolean selected, boolean connected, boolean isGroup,
+                    ServerKind type, boolean virtualHostsSupported, String defaultVirtualHostName, Set<String> virtualHostNames) {
     this.id = id;
     this.parentNames = parentNames;
     this.indentDepth = indentDepth;
@@ -22,6 +33,10 @@ public class ServerImpl implements Server {
     this.title = title;
     this.checked = selected;
     this.isGroup = isGroup;
+    this.type = type;
+    this.virtualHostsSupported = virtualHostsSupported;
+    this.defaultVirtualHostName = defaultVirtualHostName;
+    this.virtualHostNames = virtualHostNames;
   }
 
   public String getIndentDepthAsCSSClass() {
@@ -89,5 +104,20 @@ public class ServerImpl implements Server {
     return getTitle();
   }
 
+  public ServerKind getType() {
+    return type;
+  }
+
+  public Set<String> getVirtualHostNames() {
+    return virtualHostNames;
+  }
+
+  public String getDefaultVirtualHostName() {
+    return defaultVirtualHostName;
+  }
+
+  public boolean isVirtualHostsSupported() {
+    return virtualHostsSupported;
+  }
 
 }

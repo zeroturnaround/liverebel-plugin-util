@@ -7,21 +7,26 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipException;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
-import org.zeroturnaround.liverebel.plugins.util.LiveRebelXml;
-import org.zeroturnaround.liverebel.plugins.util.OverrideLiveRebelXmlUtil;
+import org.zeroturnaround.liverebel.plugins.PluginLogger;
+
 import com.zeroturnaround.liverebel.api.*;
+import com.zeroturnaround.liverebel.api.deploy.ConfigurableDeploy;
+import com.zeroturnaround.liverebel.api.deploy.ConfigurableUndeploy;
 import com.zeroturnaround.liverebel.api.diff.DiffResult;
 import com.zeroturnaround.liverebel.api.diff.Level;
 import com.zeroturnaround.liverebel.api.update.ConfigurableUpdate;
-
-import static org.zeroturnaround.liverebel.plugins.util.OverrideLiveRebelXmlUtil.getLiveRebelXml;
+import com.zeroturnaround.liverebel.util.LiveRebelXml;
+import com.zeroturnaround.liverebel.util.OverrideLiveRebelXmlUtil;
+import com.zeroturnaround.liverebel.util.ServerKind;
 
 public class PluginUtil {
   private PluginLogger logger;
@@ -31,6 +36,7 @@ public class PluginUtil {
 
   public final static int DEFAULT_SESSION_DRAIN = 3600;
   public final static int DEFAULT_REQUEST_PAUSE = 30;
+  public final static boolean DEFAULT_DISABLE_SCRIPTS = false;
 
   public enum PluginActionResult {
     SUCCESS,
@@ -120,17 +126,16 @@ public class PluginUtil {
         deployOrUpdate(conf);
         break;
       case UNDEPLOY:
-        undeploy(conf.undeployId, getServers(conf.serverIds));
+        undeploy(conf);
         break;
     }
   }
 
   private void deployOrUpdate(PluginConf conf) throws IOException, InterruptedException {
     upload(conf);
-    LiveRebelXml lrXml = getLiveRebelXml(conf.deployable);
+    LiveRebelXml lrXml = OverrideLiveRebelXmlUtil.getLiveRebelXml(conf.deployable);
     ApplicationInfo applicationInfo = getCommandCenter().getApplication(lrXml.getApplicationId());
-
-    update(lrXml, applicationInfo, getServers(conf.serverIds), conf.contextPath, conf.updateStrategies);
+    update(lrXml, applicationInfo, conf);
     logger.log(String.format(ARTIFACT_DEPLOYED_AND_UPDATED, conf.serverIds.size(), conf.deployable));
   }
 
@@ -140,7 +145,8 @@ public class PluginUtil {
     for (String serverId : serverIds) {
       ServerInfo serverinfo = existingServers.get(serverId);
       if (existingServers.containsKey(serverId) && serverinfo.isConnected()) {
-        servers.add(new ServerImpl(serverId, serverinfo.getName(),"", 0, false, serverinfo.isConnected(), false));
+        servers.add(new ServerImpl(serverId, serverinfo.getName(), "", 0, false, serverinfo.isConnected(), false, serverinfo.getType(),
+            serverinfo.isVirtualHostsSupported(), serverinfo.getDefaultVirtualHostName(), serverinfo.getVirtualHostNames()));
       } else {
         logger.error("WARNING! Unknown or offline server with id: " + serverId);
       }
@@ -149,7 +155,7 @@ public class PluginUtil {
   }
 
   private void upload(PluginConf conf) throws IOException, InterruptedException {
-    LiveRebelXml lrXml = getLiveRebelXml(conf.deployable);
+    LiveRebelXml lrXml = OverrideLiveRebelXmlUtil.getLiveRebelXml(conf.deployable);
 
     ApplicationInfo applicationInfo = getCommandCenter().getApplication(lrXml.getApplicationId());
     if (applicationInfo != null && applicationInfo.getVersions().contains(lrXml.getVersionId())) {
@@ -165,17 +171,30 @@ public class PluginUtil {
     }
   }
 
-  private void undeploy(String applicationId, List<Server> selectedServers) {
-    logger.log(String.format("Undeploying application %s on %s.\n", applicationId, selectedServers));
+  private void undeploy(PluginConf conf) {
+    if (conf.hasStaticContent) {
+      conf.serverIds.addAll(conf.staticServerIds);
+    }
+    List<Server> selectedServers = getServers(conf.serverIds);
+    logger.log(String.format("Undeploying application %s on %s.\n", conf.undeployId, selectedServers));
+
     if (selectedServers.isEmpty()) {
       throw new IllegalArgumentException("Undeploy selected with no online servers!");
     }
-    commandCenter.undeploy(applicationId, toIds(selectedServers));
+    ConfigurableUndeploy undeploy = getCommandCenter().undeploy(conf.undeployId);
+
+    undeploy.on(toIds(selectedServers));
+
+    if (conf.hasDatabaseMigrations) {
+      undeploy.setSchemaIds(Collections.singleton(Long.valueOf(conf.schemaId)));
+    }
+
+    executeConfigurableAction(undeploy);
     logger.log(String.format("SUCCESS: Application undeploying from %s.\n", selectedServers));
   }
 
   private void uploadMetadata(LiveRebelXml liveRebelXml, File metadata) {
-    commandCenter.uploadMetadata(metadata, liveRebelXml.getApplicationId(), liveRebelXml.getVersionId());
+    commandCenter.uploadTrace(metadata, liveRebelXml.getApplicationId(), liveRebelXml.getVersionId());
   }
 
   private boolean uploadArtifact(File artifact) throws IOException, InterruptedException {
@@ -214,15 +233,17 @@ public class PluginUtil {
     }
   }
 
-  void update(LiveRebelXml lrXml, ApplicationInfo applicationInfo, List<Server> selectedServers, String contextPath, UpdateStrategies updateStrategies) throws IOException,
-    InterruptedException {
-
+  private void update(LiveRebelXml lrXml, ApplicationInfo applicationInfo, PluginConf conf) throws IOException, InterruptedException {
+    List<Server> selectedServers = getServers(conf.serverIds);
+    if (conf.hasStaticContent) {
+      selectedServers.addAll(getServers(conf.staticServerIds));
+    }
     if (selectedServers.isEmpty())
       throw new IllegalArgumentException("Deploy or update artifact was selected without any servers!");
-
     Set<Server> deployServers = getDeployServers(applicationInfo, selectedServers);
+
     if (!deployServers.isEmpty()) {
-      deploy(lrXml, deployServers, contextPath);
+      deploy(lrXml, deployServers, conf);
     }
 
     if (deployServers.size() != selectedServers.size()) {
@@ -231,16 +252,55 @@ public class PluginUtil {
 
       Level diffLevel = getMaxDifferenceLevel(applicationInfo, lrXml, activateServers);
 
-      activate(lrXml, activateServers, diffLevel, updateStrategies);
+      activate(lrXml, activateServers, diffLevel, conf);
     }
   }
 
-  void deploy(LiveRebelXml lrXml, Set<Server> servers, String contextPath) {
+  private void deploy(LiveRebelXml lrXml, Set<Server> servers, PluginConf conf) {
+
     logger.log(String.format("Deploying new application on %s.\n", servers));
-    if (contextPath == null || contextPath.equals(""))
-      contextPath = null;
-    getCommandCenter().deploy(lrXml.getApplicationId(), lrXml.getVersionId(), contextPath, toIds(servers));
+    if (conf.contextPath == null || conf.contextPath.length() == 0)
+      conf.contextPath = null;
+
+    // if this is static app and only fileservers and web proxies were selected, use context path value as file path
+    if (onlyFileserversAndProxiesSelected(servers) && conf.contextPath != null) {
+      conf.filePath = conf.contextPath;
+    }
+
+    if (conf.virtualHostName == null)
+      conf.virtualHostName = "";
+
+    ConfigurableDeploy deploy = getCommandCenter().deploy(lrXml.getApplicationId(), lrXml.getVersionId());
+
+    deploy.on(toIds(servers));
+
+    deploy.setContextPath(conf.contextPath);
+    deploy.setVirtualHostName(conf.virtualHostName);
+
+    if (conf.hasDatabaseMigrations) {
+      deploy.setProxyTargetServerId(conf.targetProxyId);
+      deploy.setSchemaIds(Collections.singleton(Long.valueOf(conf.schemaId)));
+    }
+
+    if (conf.filePath != null) {
+      deploy.setFileServerDeploymentPath(conf.filePath);
+    }
+
+    if (conf.destinationFileName != null) {
+      deploy.setDestinationFileName(conf.destinationFileName);
+    }
+
+    executeConfigurableAction(deploy);
+
     logger.log(String.format("SUCCESS: Application deployed to %s.\n", servers));
+  }
+
+  private boolean onlyFileserversAndProxiesSelected(Set<Server> servers) {
+    for (Server server : servers) {
+      if (!(server.getType() == null || server.getType() == ServerKind.FILE || server.getType() == ServerKind.WEB_PROXY))
+        return false;
+    }
+    return true;
   }
 
   private Collection<String> toIds(Collection<Server> servers) {
@@ -251,19 +311,26 @@ public class PluginUtil {
     return serverIds;
   }
 
-  void activate(LiveRebelXml lrXml, Set<Server> servers, Level diffLevel, UpdateStrategies updateStrategies) throws IOException,
-    InterruptedException {
+  void activate(LiveRebelXml lrXml, Set<Server> servers, Level diffLevel, PluginConf conf) throws IOException,
+      InterruptedException {
     logger.log("Beginning activation of " + lrXml.getApplicationId() + " " + lrXml.getVersionId() + " on servers: " + servers);
     ConfigurableUpdate update = getCommandCenter().update(lrXml.getApplicationId(), lrXml.getVersionId());
 
-    update.on(toIds(servers)); //must be BEFORE calling enambleAutoStrategy!!
-    if (updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.LIVEREBEL_DEFAULT)) {
-      update.enableAutoStrategy(updateStrategies.updateWithWarnings());
-    } else {
-      manualUpdateConfiguration(diffLevel, updateStrategies, update, servers.size());
+    update.on(toIds(servers)); // must be BEFORE calling enableAutoStrategy!!
+    // we can change migration settings when updating
+    if (conf.hasDatabaseMigrations) {
+      update.setProxyTargetServerId(conf.targetProxyId);
+      update.setSchemaIds(Collections.singleton(Long.valueOf(conf.schemaId)));
     }
 
-    update.execute();
+    if (conf.updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.LIVEREBEL_DEFAULT)) {
+      update.enableAutoStrategy(conf.updateStrategies.updateWithWarnings());
+    }
+    else {
+      manualUpdateConfiguration(diffLevel, conf.updateStrategies, update, servers.size());
+    }
+
+    executeConfigurableAction(update);
   }
 
   private void manualUpdateConfiguration(Level diffLevel, UpdateStrategies updateStrategies, ConfigurableUpdate update, int serversCount) {
@@ -274,6 +341,10 @@ public class PluginUtil {
       update.enableRolling();
       update.withTimeout(updateStrategies.getSessionDrainTimeout());
     } else if (updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.OFFLINE)) {
+      update.enableOffline();
+      update.withTimeout(updateStrategies.getConnectionPauseTimeout());
+    }
+    else if (updateStrategies.getPrimaryUpdateStrategy().equals(UpdateMode.ALL_AT_ONCE_UPDATE)) {
       update.enableOffline();
       update.withTimeout(updateStrategies.getConnectionPauseTimeout());
     }
@@ -371,11 +442,44 @@ public class PluginUtil {
   public static boolean isMetadataSupported(CommandCenter commandCenter) {
     return commandCenter != null && !commandCenter.getVersion().equals("2.0");
   }
-  
+
   private  String getStackTrace(Throwable aThrowable) {
     final Writer result = new StringWriter();
     final PrintWriter printWriter = new PrintWriter(result);
     aThrowable.printStackTrace(printWriter);
     return result.toString();
+  }
+
+  private void executeConfigurableAction(PreparedOperation action) {
+    Long taskId = -1L;
+    taskId = action.execute();
+
+    showTaskLog(taskId);
+  }
+
+  /**
+   * get and show task log from LR CC in job console
+   * @param taskId
+   */
+  private void showTaskLog(Long taskId) {
+    if (taskId > -1L) {
+      Collection<String> logFile = commandCenter.getLogLines(taskId);
+      printBanner(false);
+      for (String line : logFile) {
+        logger.log(line);
+      }
+      printBanner(true);
+    }
+  }
+
+  private void printBanner(boolean isEnd) {
+    logger.log("\n\n" +
+        "******************************************************\n" +
+        (isEnd ?
+            "**              END OF TASK LOG                     **\n"
+            : "**            START OF TASK LOG                     **\n") +
+        "******************************************************\n" +
+        "\n\n"
+        );
   }
 }

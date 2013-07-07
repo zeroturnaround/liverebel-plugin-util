@@ -1,13 +1,17 @@
 package org.zeroturnaround.liverebel.test.utils;
 
 import java.util.Set;
+
 import com.zeroturnaround.liverebel.api.ServerInfo;
+import com.zeroturnaround.liverebel.util.ServerKind;
 
 public class TestServerInfoImpl implements ServerInfo {
   private String id;
+  private ServerKind type;
 
-  public TestServerInfoImpl(String id) {
+  public TestServerInfoImpl(String id, ServerKind type) {
     this.id = id;
+    this.type = type;
   }
 
   public String getId() {
@@ -44,5 +48,13 @@ public class TestServerInfoImpl implements ServerInfo {
 
   public boolean isVirtualHostsSupported() {
     return false;
+  }
+
+  public Long getParentGroupId() {
+    return null;
+  }
+
+  public ServerKind getType() {
+    return this.type;
   }
 }
