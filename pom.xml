@@ -44,7 +44,7 @@
       </snapshots>
       <id>zt-public-releases</id>
       <name>ZeroTurnaround Public Releases</name>
-      <url>dav:http://repos.zeroturnaround.com/nexus/content/repositories/zt-public-releases</url>
+      <url>http://repos.zeroturnaround.com/nexus/content/repositories/zt-public-releases</url>
       <layout>default</layout>
     </repository>
     <repository>
@@ -58,7 +58,7 @@
       </snapshots>
       <id>zt-public-snapshots</id>
       <name>ZeroTurnaround Public Snapshots</name>
-      <url>dav:http://repos.zeroturnaround.com/nexus/content/repositories/zt-public-snapshots</url>
+      <url>http://repos.zeroturnaround.com/nexus/content/repositories/zt-public-snapshots</url>
       <layout>default</layout>
     </repository>
   </repositories>
