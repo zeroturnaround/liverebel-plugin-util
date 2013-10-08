@@ -133,7 +133,7 @@ public class PluginUtil {
 
   private void deployOrUpdate(PluginConf conf) throws IOException, InterruptedException {
     upload(conf);
-    LiveRebelXml lrXml = OverrideLiveRebelXmlUtil.getLiveRebelXml(conf.deployable);
+    LiveRebelXml lrXml = getLiveRebelXmlAndFailIfNotFound(conf);
     ApplicationInfo applicationInfo = getCommandCenter().getApplication(lrXml.getApplicationId());
     update(lrXml, applicationInfo, conf);
     logger.log(String.format(ARTIFACT_DEPLOYED_AND_UPDATED, conf.serverIds.size(), conf.deployable));
@@ -155,7 +155,7 @@ public class PluginUtil {
   }
 
   private void upload(PluginConf conf) throws IOException, InterruptedException {
-    LiveRebelXml lrXml = OverrideLiveRebelXmlUtil.getLiveRebelXml(conf.deployable);
+    LiveRebelXml lrXml = getLiveRebelXmlAndFailIfNotFound(conf);
 
     ApplicationInfo applicationInfo = getCommandCenter().getApplication(lrXml.getApplicationId());
     if (applicationInfo != null && applicationInfo.getVersions().contains(lrXml.getVersionId())) {
@@ -169,6 +169,12 @@ public class PluginUtil {
       uploadMetadata(lrXml, conf.metadata);
       logger.log(String.format("SUCCESS: Metadata for %s %s was uploaded.\n", lrXml.getApplicationId(), lrXml.getVersionId()));
     }
+  }
+
+  private LiveRebelXml getLiveRebelXmlAndFailIfNotFound(PluginConf conf) {
+    LiveRebelXml lrXml = OverrideLiveRebelXmlUtil.getLiveRebelXml(conf.deployable);
+    if (lrXml == null) throw new IllegalStateException(String.format("Could not find liverebel.xml from %s", conf.deployable));
+    return lrXml;
   }
 
   private void undeploy(PluginConf conf) {
