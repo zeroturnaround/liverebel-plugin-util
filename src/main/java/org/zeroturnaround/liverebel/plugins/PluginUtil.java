@@ -312,7 +312,7 @@ public class PluginUtil {
 
     executeConfigurableAction(deploy);
 
-    logger.info("Application successfully deployed to %s", servers);
+    logger.info("Application successfully deployed to {}", servers);
   }
 
   private boolean onlyFileserversAndProxiesSelected(Set<Server> servers) {

@@ -1,6 +1,6 @@
 package org.zeroturnaround.liverebel.plugins;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
@@ -11,13 +11,20 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -32,6 +39,8 @@ import org.zeroturnaround.liverebel.test.utils.TestLocalInfoImpl;
 import org.zeroturnaround.liverebel.test.utils.TestSchemaInfoImpl;
 import org.zeroturnaround.liverebel.test.utils.TestServerInfoImpl;
 import org.zeroturnaround.liverebel.test.utils.TestUpdateStrategiesImpl;
+import org.zeroturnaround.zip.ZipUtil;
+import org.zeroturnaround.zip.transform.ZipEntryTransformerEntry;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -56,16 +65,33 @@ public class PluginUtilTest {
 
   @Rule public TestName testName = new TestName();
 
+  private ByteArrayOutputStream testOutput;
   private PluginBuildLogListener logListener;
 
   @Before
   public void configureLogging() {
-    logListener = PluginLoggerFactory.getInstance().addBuildLogListener(System.out, "test", PluginUtilTest.class.getSimpleName() + "." + testName.getMethodName() + " ", null, true);
+    this.testOutput = new ByteArrayOutputStream(1024);
+    PrintStream ps = new PrintStream(this.testOutput);
+    logListener = PluginLoggerFactory.getInstance().addBuildLogListener(ps, "test", getTestName() + " ", null, true);
+  }
+
+  private String getTestName() {
+    return PluginUtilTest.class.getSimpleName() + "." + testName.getMethodName();
+  }
+
+  private String getTestBuildLog() {
+    try {
+      return new String(testOutput.toByteArray(), "UTF-8");
+    }
+    catch (UnsupportedEncodingException e) {
+      throw new IllegalStateException("should never happen", e);
+    }
   }
 
   @After
-  public void closeLogging() {
+  public void closeLogging() throws UnsupportedEncodingException {
     PluginLoggerFactory.getInstance().removeBuildLogListener(logListener);
+    System.out.println("Output from '" + getTestName() + "' build logger:\n" + getTestBuildLog());
   }
 
   private static Map<String, ServerInfo> createMockedServer() {
@@ -103,6 +129,39 @@ public class PluginUtilTest {
     assertFalse(testConfigurableUpdateSpy.isOffline());
     assertFalse(testConfigurableUpdateSpy.isRolling());
     verify(testConfigurableUpdateSpy).enableAutoStrategy(true);
+    assertBuildLogDoesNotContainExceptions();
+    assertBuildLogDoesNotContainErrors();
+  }
+
+  @Test
+  public void testWarUpdateWithoutLiverebelXml() {
+    CommandCenterFactory commandCenterFactory = Mockito.mock(CommandCenterFactory.class);
+    mockCC(commandCenterFactory);
+    PluginUtil pluginUtilSpy = spyPluginUtil(commandCenterFactory);
+
+    PluginConf conf = new PluginConf(PluginConf.Action.DEPLOY_OR_UPDATE);
+    File appWarWithLiverebelXml = new File(archivesDir, "lr-demo-ver1.war");
+    File appWarWithoutLiverebelXml = new File(FileUtils.getTempDirectory(), "lr-demo-ver1-without-liverebel-xml.war");
+    ZipUtil.removeEntry(appWarWithLiverebelXml, "WEB-INF/classes/liverebel.xml", appWarWithoutLiverebelXml);
+    conf.deployable = appWarWithoutLiverebelXml;
+    try {
+      conf.contextPath = "testDefaultUpdate";
+      conf.updateStrategies = new TestUpdateStrategiesImpl(UpdateMode.LIVEREBEL_DEFAULT, UpdateMode.LIVEREBEL_DEFAULT, 30, true, 30);
+      conf.serverIds = Lists.newArrayList("dummy");
+
+      assertEquals(PluginUtil.PluginActionResult.ERROR, pluginUtilSpy.perform(conf));
+      assertBuildLogDoesNotContainExceptions();
+    }
+    finally {
+      FileUtils.deleteQuietly(conf.deployable);
+    }
+  }
+
+  private void assertBuildLogDoesNotContainExceptions() {
+    assertTrue("log should not contain exceptions", !getTestBuildLog().contains("Exception"));
+  }
+  private void assertBuildLogDoesNotContainErrors() {
+    assertTrue("log should not contain error level rows", !getTestBuildLog().contains("ERROR"));
   }
 
   private TestConfigurableUpdateImpl spyConfigurableUpdate(CommandCenter commandCenter) {
@@ -153,6 +212,8 @@ public class PluginUtilTest {
     assertTrue(testConfigurableUpdateSpy.isRolling());
     assertFalse(testConfigurableUpdateSpy.isOffline());
     verify(testConfigurableUpdateSpy).enableRolling();
+    assertBuildLogDoesNotContainExceptions();
+    assertBuildLogDoesNotContainErrors();
   }
 
   private PluginUtil spyPluginUtil(CommandCenterFactory commandCenterFactory) {
@@ -184,28 +245,59 @@ public class PluginUtilTest {
     assertTrue(testConfigurableUpdateSpy.isOffline());
     assertFalse(testConfigurableUpdateSpy.isRolling());
     verify(testConfigurableUpdateSpy).enableOffline();
+    assertBuildLogDoesNotContainExceptions();
+    assertBuildLogDoesNotContainErrors();
   }
 
-  //@Test
-  public void testZipDeployOrUpdate() {
+  @Test
+  public void testZipDeployOrUpdate() throws IOException {
     CommandCenterFactory commandCenterFactory = Mockito.mock(CommandCenterFactory.class);
     CommandCenter commandCenter = mockCC(commandCenterFactory);
-    TestConfigurableUpdateImpl testConfigurableUpdateSpy = spy(new TestConfigurableUpdateImpl());
-    Mockito.when(commandCenter.update(anyString(), anyString())).thenReturn(testConfigurableUpdateSpy);
+    TestConfigurableDeployImpl testConfigurableDeploySpy = spy(new TestConfigurableDeployImpl());
+    Mockito.when(commandCenter.deploy(anyString(), anyString())).thenReturn(testConfigurableDeploySpy);
     PluginUtil pluginUtilSpy = spyPluginUtil(commandCenterFactory);
 
     PluginConf conf = new PluginConf(PluginConf.Action.DEPLOY_OR_UPDATE);
-    conf.deployable = new File(archivesDir, "lr-demo-ver1.zip");
-    conf.contextPath = "/var/www/testOffline";
-    conf.updateStrategies = new TestUpdateStrategiesImpl(UpdateMode.LIVEREBEL_DEFAULT, null, 30, false, 3600);
-    conf.serverIds = Lists.newArrayList("fileserver");
-    System.out.println("conf: " + conf);
+    File appZip = new File(FileUtils.getTempDirectory(), "lr-demo-ver1.zip");
+    FileUtils.copyFile(new File(archivesDir, "lr-demo-ver1.war"), appZip);
+    conf.deployable = appZip;
+    try {
+      conf.contextPath = "/var/www/testOffline";
+      conf.updateStrategies = new TestUpdateStrategiesImpl(UpdateMode.LIVEREBEL_DEFAULT, null, 30, false, 3600);
+      conf.serverIds = Lists.newArrayList("fileserver");
 
-    assertEquals(PluginUtil.PluginActionResult.SUCCESS, pluginUtilSpy.perform(conf));
-    assertEquals("OFFLINE", testConfigurableUpdateSpy.updateMode);
-    assertTrue(testConfigurableUpdateSpy.isOffline());
-    assertFalse(testConfigurableUpdateSpy.isRolling());
-    verify(testConfigurableUpdateSpy).enableOffline();
+      assertEquals(PluginUtil.PluginActionResult.SUCCESS, pluginUtilSpy.perform(conf));
+      assertBuildLogDoesNotContainExceptions();
+      assertBuildLogDoesNotContainErrors();
+    }
+    finally {
+      FileUtils.deleteQuietly(appZip);
+    }
+  }
+
+  @Test
+  public void testZipDeployWithoutLiverebelXml() throws IOException {
+    CommandCenterFactory commandCenterFactory = Mockito.mock(CommandCenterFactory.class);
+    CommandCenter commandCenter = mockCC(commandCenterFactory);
+    TestConfigurableDeployImpl testConfigurableDeploySpy = spy(new TestConfigurableDeployImpl());
+    Mockito.when(commandCenter.deploy(anyString(), anyString())).thenReturn(testConfigurableDeploySpy);
+    PluginUtil pluginUtilSpy = spyPluginUtil(commandCenterFactory);
+
+    PluginConf conf = new PluginConf(PluginConf.Action.DEPLOY_OR_UPDATE);
+    File appZipWithoutLiverebelXml = new File(FileUtils.getTempDirectory(), "lr-demo-ver1-without-liverebel-xml.zip");
+    ZipUtil.removeEntry(new File(archivesDir, "lr-demo-ver1.war"), "WEB-INF/classes/liverebel.xml", appZipWithoutLiverebelXml);
+    conf.deployable = appZipWithoutLiverebelXml;
+    try {
+      conf.contextPath = "/var/www/testOffline";
+      conf.updateStrategies = new TestUpdateStrategiesImpl(UpdateMode.LIVEREBEL_DEFAULT, null, 30, false, 3600);
+      conf.serverIds = Lists.newArrayList("fileserver");
+
+      assertEquals(PluginUtil.PluginActionResult.ERROR, pluginUtilSpy.perform(conf));
+      assertBuildLogDoesNotContainExceptions();
+    }
+    finally {
+      FileUtils.deleteQuietly(appZipWithoutLiverebelXml);
+    }
   }
 
   private UploadInfo createDummyUploadInfo() {
@@ -351,6 +443,8 @@ public class PluginUtilTest {
     assertFalse(testConfigurableUpdateSpy.isOffline());
     assertFalse(testConfigurableUpdateSpy.isRolling());
     verify(testConfigurableUpdateSpy).enableAutoStrategy(true);
+    assertBuildLogDoesNotContainExceptions();
+    assertBuildLogDoesNotContainErrors();
   }
 
   @Test
@@ -369,6 +463,7 @@ public class PluginUtilTest {
     conf.hasDatabaseMigrations = true;
     // no schema selected, must fail
     assertEquals(PluginUtil.PluginActionResult.ERROR, pluginUtilSpy.perform(conf));
+    assertBuildLogDoesNotContainExceptions();
   }
 
   @Test
@@ -398,6 +493,8 @@ public class PluginUtilTest {
     assertEquals(FILE_PATH, testConfigurableDeploySpy.getFileDeploymentPath());
     assertFalse(testConfigurableDeploySpy.isOffline());
     assertFalse(testConfigurableDeploySpy.isRolling());
+    assertBuildLogDoesNotContainExceptions();
+    assertBuildLogDoesNotContainErrors();
   }
 
   @Test
@@ -421,7 +518,7 @@ public class PluginUtilTest {
     conf.staticServerIds.add("fileserver");
 
     assertEquals(PluginUtil.PluginActionResult.ERROR, pluginUtilSpy.perform(conf));
-
+    assertBuildLogDoesNotContainExceptions();
   }
 
   @Test
@@ -444,6 +541,7 @@ public class PluginUtilTest {
     conf.filePath = FILE_PATH;
 
     assertEquals(PluginUtil.PluginActionResult.ERROR, pluginUtilSpy.perform(conf));
+    assertBuildLogDoesNotContainExceptions();
   }
 
   @Test
@@ -465,6 +563,8 @@ public class PluginUtilTest {
     assertEquals(PluginUtil.PluginActionResult.SUCCESS, pluginUtilSpy.perform(conf));
     assertEquals(FILE_PATH, testConfigurableDeploySpy.getFileDeploymentPath());
     assertEquals(FILE_PATH, conf.filePath);
+    assertBuildLogDoesNotContainExceptions();
+    assertBuildLogDoesNotContainErrors();
   }
 
 }
