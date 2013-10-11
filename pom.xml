@@ -72,6 +72,10 @@
       <id>glebsts</id>
       <name>Gleb Stsenov</name>
     </developer>
+    <developer>
+      <id>nemecec</id>
+      <name>Neeme Praks</name>
+    </developer>
   </developers>
 
   <dependencies>
@@ -79,31 +83,23 @@
       <groupId>com.zeroturnaround.liverebel</groupId>
       <artifactId>lr-api</artifactId>
       <version>2.7.5</version>
+      <exclusions>
+        <exclusion>
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.zeroturnaround.liverebel</groupId>
       <artifactId>lr-public-util</artifactId>
       <version>2.7.5</version>
-    </dependency>
-    <dependency>
-      <groupId>commons-io</groupId>
-      <artifactId>commons-io</artifactId>
-      <version>2.2</version>
-    </dependency>
-    <dependency>
-      <groupId>commons-lang</groupId>
-      <artifactId>commons-lang</artifactId>
-      <version>2.6</version>
-    </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.8.2</version>
-    </dependency>
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-all</artifactId>
-      <version>1.8.5</version>
+      <exclusions>
+        <exclusion>
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -111,14 +107,41 @@
       <version>11.0.2</version>
     </dependency>
     <dependency>
-      <groupId>be.cyberelf.nanoxml</groupId>
-      <artifactId>lite</artifactId>
-      <version>2.2.3</version>
-    </dependency>
-    <dependency>
       <groupId>org.zeroturnaround</groupId>
       <artifactId>zt-zip</artifactId>
       <version>1.5</version>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <version>1.0.6</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-jdk14</artifactId>
+      <version>1.6.3</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>jcl-over-slf4j</artifactId>
+      <version>1.6.3</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>log4j-over-slf4j</artifactId>
+      <version>1.6.3</version>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.8.2</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-all</artifactId>
+      <version>1.8.5</version>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 
@@ -165,7 +188,34 @@
         <configuration>
           <excludePackageNames>org.zeroturnaround.liverebel.plugins</excludePackageNames>
         </configuration>
-
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <filters>
+                <filter>
+                  <artifact>ch.qos.logback:logback-classic</artifact>
+                  <excludes>
+                    <exclude>org/slf4j/impl/Static*</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>org.slf4j:slf4j-jdk14</artifact>
+                  <excludes>
+                    <exclude>org/slf4j/impl/Static*</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

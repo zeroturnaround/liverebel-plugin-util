@@ -1,5 +1,16 @@
 package org.zeroturnaround.liverebel.plugins;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -7,12 +18,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 import org.mockito.Mockito;
+import org.zeroturnaround.liverebel.plugins.logging.PluginBuildLogListener;
+import org.zeroturnaround.liverebel.plugins.logging.PluginLoggerFactory;
 import org.zeroturnaround.liverebel.test.utils.TestConfigurableDeployImpl;
 import org.zeroturnaround.liverebel.test.utils.TestConfigurableUpdateImpl;
 import org.zeroturnaround.liverebel.test.utils.TestLocalInfoImpl;
-import org.zeroturnaround.liverebel.test.utils.TestPluginLogger;
 import org.zeroturnaround.liverebel.test.utils.TestSchemaInfoImpl;
 import org.zeroturnaround.liverebel.test.utils.TestServerInfoImpl;
 import org.zeroturnaround.liverebel.test.utils.TestUpdateStrategiesImpl;
@@ -33,15 +49,24 @@ import com.zeroturnaround.liverebel.api.diff.Level;
 import com.zeroturnaround.liverebel.util.LiveRebelXml;
 import com.zeroturnaround.liverebel.util.ServerKind;
 
-import static org.junit.Assert.*;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.*;
-
 public class PluginUtilTest {
   private static final File archivesDir = new File(PluginUtilTest.class.getResource("archives").getFile());
   private static final Map<String, ServerInfo> mockedServers = createMockedServer();
   private static final Map<Long, SchemaInfo> mockedSchemas = createMockedSchemas();
+
+  @Rule public TestName testName = new TestName();
+
+  private PluginBuildLogListener logListener;
+
+  @Before
+  public void configureLogging() {
+    logListener = PluginLoggerFactory.getInstance().addBuildLogListener(System.out, "test", PluginUtilTest.class.getSimpleName() + "." + testName.getMethodName() + " ", null, true);
+  }
+
+  @After
+  public void closeLogging() {
+    PluginLoggerFactory.getInstance().removeBuildLogListener(logListener);
+  }
 
   private static Map<String, ServerInfo> createMockedServer() {
     Map<String, ServerInfo> mockedServers = new HashMap<String, ServerInfo>();
@@ -131,7 +156,7 @@ public class PluginUtilTest {
   }
 
   private PluginUtil spyPluginUtil(CommandCenterFactory commandCenterFactory) {
-    PluginUtil pluginUtil = new PluginUtil(commandCenterFactory, new TestPluginLogger());
+    PluginUtil pluginUtil = new PluginUtil(commandCenterFactory, new PluginMessages());
     PluginUtil pluginUtilSpy =  spy(pluginUtil);
     DiffResult diffResult = mock(DiffResult.class);
     Mockito.when(diffResult.getMaxLevel()).thenReturn(Level.INFO);
@@ -153,6 +178,28 @@ public class PluginUtilTest {
     conf.contextPath = "testOffline";
     conf.updateStrategies = new TestUpdateStrategiesImpl(UpdateMode.OFFLINE, UpdateMode.LIVEREBEL_DEFAULT, 30, true, 30);
     conf.serverIds = Lists.newArrayList("dummy");
+
+    assertEquals(PluginUtil.PluginActionResult.SUCCESS, pluginUtilSpy.perform(conf));
+    assertEquals("OFFLINE", testConfigurableUpdateSpy.updateMode);
+    assertTrue(testConfigurableUpdateSpy.isOffline());
+    assertFalse(testConfigurableUpdateSpy.isRolling());
+    verify(testConfigurableUpdateSpy).enableOffline();
+  }
+
+  //@Test
+  public void testZipDeployOrUpdate() {
+    CommandCenterFactory commandCenterFactory = Mockito.mock(CommandCenterFactory.class);
+    CommandCenter commandCenter = mockCC(commandCenterFactory);
+    TestConfigurableUpdateImpl testConfigurableUpdateSpy = spy(new TestConfigurableUpdateImpl());
+    Mockito.when(commandCenter.update(anyString(), anyString())).thenReturn(testConfigurableUpdateSpy);
+    PluginUtil pluginUtilSpy = spyPluginUtil(commandCenterFactory);
+
+    PluginConf conf = new PluginConf(PluginConf.Action.DEPLOY_OR_UPDATE);
+    conf.deployable = new File(archivesDir, "lr-demo-ver1.zip");
+    conf.contextPath = "/var/www/testOffline";
+    conf.updateStrategies = new TestUpdateStrategiesImpl(UpdateMode.LIVEREBEL_DEFAULT, null, 30, false, 3600);
+    conf.serverIds = Lists.newArrayList("fileserver");
+    System.out.println("conf: " + conf);
 
     assertEquals(PluginUtil.PluginActionResult.SUCCESS, pluginUtilSpy.perform(conf));
     assertEquals("OFFLINE", testConfigurableUpdateSpy.updateMode);

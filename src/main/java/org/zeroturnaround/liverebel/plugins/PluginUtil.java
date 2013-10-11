@@ -2,9 +2,6 @@ package org.zeroturnaround.liverebel.plugins;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -16,9 +13,21 @@ import java.util.zip.ZipException;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
-import org.zeroturnaround.liverebel.plugins.PluginLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.zeroturnaround.liverebel.api.*;
+import com.zeroturnaround.liverebel.api.ApplicationInfo;
+import com.zeroturnaround.liverebel.api.CommandCenter;
+import com.zeroturnaround.liverebel.api.CommandCenterFactory;
+import com.zeroturnaround.liverebel.api.Conflict;
+import com.zeroturnaround.liverebel.api.ConnectException;
+import com.zeroturnaround.liverebel.api.DuplicationException;
+import com.zeroturnaround.liverebel.api.Forbidden;
+import com.zeroturnaround.liverebel.api.LocalInfo;
+import com.zeroturnaround.liverebel.api.ParseException;
+import com.zeroturnaround.liverebel.api.PreparedOperation;
+import com.zeroturnaround.liverebel.api.ServerInfo;
+import com.zeroturnaround.liverebel.api.UploadInfo;
 import com.zeroturnaround.liverebel.api.deploy.ConfigurableDeploy;
 import com.zeroturnaround.liverebel.api.deploy.ConfigurableUndeploy;
 import com.zeroturnaround.liverebel.api.diff.DiffResult;
@@ -29,10 +38,11 @@ import com.zeroturnaround.liverebel.util.OverrideLiveRebelXmlUtil;
 import com.zeroturnaround.liverebel.util.ServerKind;
 
 public class PluginUtil {
-  private PluginLogger logger;
+
+  private final Logger logger = LoggerFactory.getLogger(getClass());
   private CommandCenter commandCenter;
   private CommandCenterFactory commandCenterFactory;
-  public static final String ARTIFACT_DEPLOYED_AND_UPDATED = "SUCCESS. Artifact deployed and activated in all %d servers: %s\n";
+  private final PluginMessages pluginMessages;
 
   public final static int DEFAULT_SESSION_DRAIN = 3600;
   public final static int DEFAULT_REQUEST_PAUSE = 30;
@@ -44,12 +54,13 @@ public class PluginUtil {
     ERROR
   }
 
-  public PluginUtil(CommandCenterFactory commandCenterFactory, PluginLogger logger) {
-    this.logger = logger;
+  public PluginUtil(CommandCenterFactory commandCenterFactory, PluginMessages pluginMessages) {
     this.commandCenterFactory = commandCenterFactory;
+    this.pluginMessages = pluginMessages;
   }
 
   public PluginActionResult perform(PluginConf conf) {
+    logger.debug("perform: {}", conf);
     if (!initCommandCenter(commandCenterFactory) || this.commandCenter == null) {
       return PluginActionResult.CONNECTION_ERROR;
     }
@@ -57,48 +68,36 @@ public class PluginUtil {
     boolean success = false;
     try {
       PluginConfVerifier.verifyConf(conf);
+      logger.debug("configuration verified: {}", conf);
       tempFileCreated = checkForLiveRebelXmlOverride(conf);
       doActions(conf);
       success = true;
     }
     catch (Conflict e) {
-      logger.log("ERROR: " + e.getMessage());
+      logger.error("Error from LiveRebel API: {}", e.getMessage());
     }
     catch (IllegalArgumentException e) {
-      logger.log("ERROR: " + e.getMessage());
+      logger.error("Not a valid argument: {}", e.getMessage());
     }
     catch (IllegalStateException e) {
-      logger.log("ERROR: " + e.getMessage());
+      logger.error("Unexpected state: {}", e.getMessage());
     }
     catch (com.zeroturnaround.liverebel.api.Error e) {
-      logger.log("ERROR! Unexpected error received from server.");
-      logger.log("");
-      logger.log("URL: " + e.getURL());
-      logger.log("Status code: " + e.getStatus());
-      logger.log("Message: " + e.getMessage());
+      logger.error("Unexpected error received from Command Center!\nURL: {}\nStatus code: {}\nMessage: {}", new Object[] { e.getURL(), e.getStatus(), e.getMessage()});
     }
     catch (ParseException e) {
-      logger.log("ERROR! Unable to read server response.");
-      logger.log("");
-      logger.log("Response: " + e.getResponse());
-      logger.log("Reason: " + e.getMessage());
+      logger.error("Unable to read Command Center response!\nResponse: {}\nReason: {}", new Object[] { e.getResponse(), e.getMessage()});
     }
     catch (RuntimeException e) {
       if (e.getCause() instanceof ZipException) {
-        logger.log(String.format(
-            "ERROR! Unable to read artifact (%s). The file you trying to deploy is not an artifact or may be corrupted.\n",
-            conf.deployable));
+        logger.error("Unable to read artifact ({}). The file you trying to deploy is not an artifact or may be corrupted.", conf.deployable);
       }
       else {
-        logger.log("ERROR! Unexpected error occured:");
-        logger.log("");
-        logger.log(getStackTrace(e));
+        logger.error("Unexpected error occured!", e);
       }
     }
     catch (Throwable t) {
-      logger.log("ERROR! Unexpected error occured:");
-      logger.log("");
-      logger.log(getStackTrace(t));
+      logger.error("Unexpected error occured!", t);
     }
     finally {
       if (tempFileCreated) {
@@ -110,8 +109,18 @@ public class PluginUtil {
   }
 
   private boolean checkForLiveRebelXmlOverride(PluginConf conf) {
+    File oldDeployable = conf.deployable;
+    LiveRebelXml existingXml = OverrideLiveRebelXmlUtil.getLiveRebelXml(conf.deployable);
+    if (existingXml == null && !conf.isLiveRebelXmlOverride()) {
+      throw new IllegalStateException(pluginMessages.getLiveRebelXmlNotFound(conf.deployable));
+    }
     if (conf.isLiveRebelXmlOverride()) {
       conf.deployable = OverrideLiveRebelXmlUtil.overrideOrCreateXML(conf.deployable, conf.overrideApp, conf.overrideVer);
+      //TODO switch to below version when we have released LR API 2.7.8
+      //conf.deployable = OverrideLiveRebelXmlUtil.overrideOrCreateXML(conf.deployable, existingXml, conf.overrideApp, conf.overrideVer);
+    }
+    if (!oldDeployable.equals(conf.deployable)) {
+      logger.info("liverebel.xml override enabled, new deployable: {}", conf.deployable);
       return true;
     }
     return false;
@@ -132,11 +141,12 @@ public class PluginUtil {
   }
 
   private void deployOrUpdate(PluginConf conf) throws IOException, InterruptedException {
+    logger.debug("Upload and deploy or update: {}", conf.deployable);
     upload(conf);
     LiveRebelXml lrXml = getLiveRebelXmlAndFailIfNotFound(conf);
     ApplicationInfo applicationInfo = getCommandCenter().getApplication(lrXml.getApplicationId());
     update(lrXml, applicationInfo, conf);
-    logger.log(String.format(ARTIFACT_DEPLOYED_AND_UPDATED, conf.serverIds.size(), conf.deployable));
+    logger.info(pluginMessages.getArtifactDeployedAndUpdated(conf.serverIds.size(), conf.deployable));
   }
 
   private List<Server> getServers(List<String> serverIds) {
@@ -148,18 +158,20 @@ public class PluginUtil {
         servers.add(new ServerImpl(serverId, serverinfo.getName(), "", 0, false, serverinfo.isConnected(), false, serverinfo.getType(),
             serverinfo.isVirtualHostsSupported(), serverinfo.getDefaultVirtualHostName(), serverinfo.getVirtualHostNames()));
       } else {
-        logger.error("WARNING! Unknown or offline server with id: " + serverId);
+        logger.warn("Unknown or offline server with id {}", serverId);
       }
     }
     return servers;
   }
 
   private void upload(PluginConf conf) throws IOException, InterruptedException {
+    logger.debug("Upload {}", conf.deployable);
     LiveRebelXml lrXml = getLiveRebelXmlAndFailIfNotFound(conf);
 
     ApplicationInfo applicationInfo = getCommandCenter().getApplication(lrXml.getApplicationId());
+    logger.debug("Application info from Command Center: {}", applicationInfo);
     if (applicationInfo != null && applicationInfo.getVersions().contains(lrXml.getVersionId())) {
-      logger.log("Current version of application is already uploaded. Skipping upload.");
+      logger.info("Current version of application is already uploaded. Skipping upload.");
     }
     else {
       uploadArtifact(conf.deployable);
@@ -167,7 +179,7 @@ public class PluginUtil {
 
     if (conf.metadata != null) {
       uploadMetadata(lrXml, conf.metadata);
-      logger.log(String.format("SUCCESS: Metadata for %s %s was uploaded.\n", lrXml.getApplicationId(), lrXml.getVersionId()));
+      logger.info("Metadata for {} {} was uploaded successfully.", lrXml.getApplicationId(), lrXml.getVersionId());
     }
   }
 
@@ -178,11 +190,12 @@ public class PluginUtil {
   }
 
   private void undeploy(PluginConf conf) {
+    logger.debug("Undeploy");
     if (conf.hasStaticContent) {
       conf.serverIds.addAll(conf.staticServerIds);
     }
     List<Server> selectedServers = getServers(conf.serverIds);
-    logger.log(String.format("Undeploying application %s on %s.\n", conf.undeployId, selectedServers));
+    logger.info("Undeploying application {} from {}.", conf.undeployId, selectedServers);
 
     if (selectedServers.isEmpty()) {
       throw new IllegalArgumentException("Undeploy selected with no online servers!");
@@ -195,45 +208,46 @@ public class PluginUtil {
       undeploy.setSchemaIds(Collections.singleton(Long.valueOf(conf.schemaId)));
     }
 
+    logger.debug("Undeploying {}", conf.undeployId);
     executeConfigurableAction(undeploy);
-    logger.log(String.format("SUCCESS: Application undeploying from %s.\n", selectedServers));
+    logger.info("Application successfully undeployed from {}", selectedServers);
   }
 
   private void uploadMetadata(LiveRebelXml liveRebelXml, File metadata) {
+    logger.debug("Uploading metadata, xml: {}, meta: {}", liveRebelXml, metadata);
     commandCenter.uploadTrace(metadata, liveRebelXml.getApplicationId(), liveRebelXml.getVersionId());
   }
 
   private boolean uploadArtifact(File artifact) throws IOException, InterruptedException {
+    logger.debug("Uploading artifact: {}", artifact);
     try {
       UploadInfo upload = commandCenter.upload(artifact);
-      logger.log(String.format("SUCCESS: %s %s was uploaded.\n", upload.getApplicationId(), upload.getVersionId()));
+      logger.info("{} {} was successfully uploaded", upload.getApplicationId(), upload.getVersionId());
       return true;
     }
     catch (DuplicationException e) {
-      logger.log(e.getMessage());
+      logger.warn("Archive already exists? {}", e.getMessage());
       return false;
     }
   }
 
   public boolean initCommandCenter(CommandCenterFactory commandCenterFactory) {
     try {
+      logger.debug("initializing connection to Command Center: {}", commandCenterFactory);
       this.commandCenter = commandCenterFactory.newCommandCenter();
       return true;
     }
     catch (Forbidden e) {
-      logger.log(
-        "ERROR! Access denied. Please, navigate to Plugin Configuration to specify right LiveRebel Authentication Token.");
+      logger.error("Access denied. Please, navigate to Plugin Configuration to specify right LiveRebel Authentication Token.");
       return false;
     }
     catch (ConnectException e) {
-      logger.log("ERROR! Unable to connect to server.");
-      logger.log("");
-      logger.log("URL: " + e.getURL());
+      logger.error("Unable to connect to server.\n\nURL: {}", e.getURL());
       if (e.getURL().equals("https://")) {
-        logger.log("Please, navigate to Plugin Configuration to specify running LiveRebel Url.");
+        logger.info("Please navigate to Plugin Configuration to specify running LiveRebel URL.");
       }
       else {
-        logger.log("Reason: " + e.getMessage());
+        logger.error("Reason: {}", e.getMessage());
       }
       return false;
     }
@@ -264,7 +278,7 @@ public class PluginUtil {
 
   private void deploy(LiveRebelXml lrXml, Set<Server> servers, PluginConf conf) {
 
-    logger.log(String.format("Deploying new application on %s.\n", servers));
+    logger.info("Deploying new application on {}", servers);
     if (conf.contextPath == null || conf.contextPath.length() == 0)
       conf.contextPath = null;
 
@@ -298,7 +312,7 @@ public class PluginUtil {
 
     executeConfigurableAction(deploy);
 
-    logger.log(String.format("SUCCESS: Application deployed to %s.\n", servers));
+    logger.info("Application successfully deployed to %s", servers);
   }
 
   private boolean onlyFileserversAndProxiesSelected(Set<Server> servers) {
@@ -319,7 +333,7 @@ public class PluginUtil {
 
   void activate(LiveRebelXml lrXml, Set<Server> servers, Level diffLevel, PluginConf conf) throws IOException,
       InterruptedException {
-    logger.log("Beginning activation of " + lrXml.getApplicationId() + " " + lrXml.getVersionId() + " on servers: " + servers);
+    logger.info("Activating {} {} on servers: {}", new Object[] { lrXml.getApplicationId(), lrXml.getVersionId(), servers });
     ConfigurableUpdate update = getCommandCenter().update(lrXml.getApplicationId(), lrXml.getVersionId());
 
     update.on(toIds(servers)); // must be BEFORE calling enableAutoStrategy!!
@@ -416,9 +430,8 @@ public class PluginUtil {
       if (StringUtils.equals(versionToUpdateTo, versionInServer)) {
         serversWithSameVersion++;
         serversToUpdate.remove(server);
-        logger.log(
-          "Server " + server + " already contains active version " + lrXml.getVersionId() + " of application "
-            + lrXml.getApplicationId());
+        logger.info(
+          "Server {} already contains active version {} of application {}", new Object[] { server, lrXml.getVersionId(), lrXml.getApplicationId() });
       }
       else {
         DiffResult differences = getDifferences(lrXml, versionInServer);
@@ -449,14 +462,8 @@ public class PluginUtil {
     return commandCenter != null && !commandCenter.getVersion().equals("2.0");
   }
 
-  private  String getStackTrace(Throwable aThrowable) {
-    final Writer result = new StringWriter();
-    final PrintWriter printWriter = new PrintWriter(result);
-    aThrowable.printStackTrace(printWriter);
-    return result.toString();
-  }
-
   private void executeConfigurableAction(PreparedOperation action) {
+    logger.debug("executing: {}", action);
     Long taskId = -1L;
     taskId = action.execute();
 
@@ -472,14 +479,14 @@ public class PluginUtil {
       Collection<String> logFile = commandCenter.getLogLines(taskId);
       printBanner(false);
       for (String line : logFile) {
-        logger.log(line);
+        logger.info(line);
       }
       printBanner(true);
     }
   }
 
   private void printBanner(boolean isEnd) {
-    logger.log("\n\n" +
+    logger.info("\n\n" +
         "******************************************************\n" +
         (isEnd ?
             "**              END OF TASK LOG                     **\n"
