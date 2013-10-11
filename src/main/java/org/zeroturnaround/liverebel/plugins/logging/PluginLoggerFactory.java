@@ -91,7 +91,10 @@ public class PluginLoggerFactory implements ILoggerFactory {
     buildLoggerFactory.getLogger("com.zeroturnaround").setLevel(pluginLogLevel);
     buildLoggerFactory.getLogger("org.zeroturnaround").setLevel(pluginLogLevel);
     buildLoggerFactory.getLogger("com.zeroturnaround.liverebel.api.shaded").setLevel(Level.INFO);
-    if (pluginLogName != null) buildLoggerFactory.getLogger(pluginLogName).setLevel(pluginLogLevel);
+    if (pluginLogName != null) {
+      buildLoggerFactory.getLogger(pluginLogName).setLevel(pluginLogLevel);
+      buildLoggerFactory.getLogger(pluginLogName + ".shaded").setLevel(Level.INFO);
+    }
     PluginBuildLogListener listener = new PluginBuildLogListener(appender);
     synchronized (listeners) {
       if (listeners.size() == 0) {
