@@ -10,6 +10,9 @@
     server plugins like LiveRebel Jenkins plugin and LiveRebel Bamboo plugin.
   </description>
 
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
 
   <scm>
     <connection>scm:git:git://github.com/zeroturnaround/liverebel-plugin-util.git</connection>
