@@ -45,4 +45,12 @@ public class TestUpdateStrategiesImpl implements UpdateStrategies {
   public int getConnectionPauseTimeout() {
     return connectionPause;
   }
+
+  @Override
+  public String toString() {
+    return "TestUpdateStrategiesImpl [primary=" + primary + ", fallback=" + fallback + ", updateWithWarnings="
+        + updateWithWarnings + ", sessionDrainTimeout=" + sessionDrain + ", requestPauseTimeout=" + requestPause
+        + ", connectionPauseTimeout=" + connectionPause + "]";
+  }
+
 }
