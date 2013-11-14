@@ -1,18 +1,19 @@
 package org.zeroturnaround.liverebel.plugins;
 
-import com.google.common.collect.Lists;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import com.zeroturnaround.liverebel.api.CommandCenter;
 import com.zeroturnaround.liverebel.api.SchemaInfo;
 import com.zeroturnaround.liverebel.api.ServerGroup;
 import com.zeroturnaround.liverebel.api.ServerGroupOperations;
 import com.zeroturnaround.liverebel.api.ServerInfo;
-
-import org.zeroturnaround.liverebel.plugins.Server;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.zeroturnaround.liverebel.util.ServerKind;
 
 public class ServersUtil {
 
@@ -49,12 +50,26 @@ public class ServersUtil {
     }
   }
 
+  public List<Server> getDatabaseServers() {
+    return getServers(ServerKind.DATABASE);
+  }
+
   public List<Server> getDefaultServers() {
+    Set<ServerKind> kinds = new HashSet<ServerKind>(Arrays.asList(ServerKind.values()));
+    //we do not want database servers in the list of servers where we deploy apps to
+    kinds.remove(ServerKind.DATABASE);
+    return getServers(kinds);
+  }
+
+  private List<Server> getServers(ServerKind... kinds) {
+    return getServers(new HashSet<ServerKind>(Arrays.asList(kinds)));
+  }
+  private List<Server> getServers(Set<ServerKind> kinds) {
     List<Server> serversLoc = new ArrayList<Server>();
     if (commandCenter != null) {
       String currentVersion = commandCenter.getVersion();
       if (isServerGroupsSupported(currentVersion)) {
-        serversLoc = showServerGroups(commandCenter);
+        serversLoc = showServerGroups(kinds);
       }
       else {
         serversLoc = showServers(commandCenter);
@@ -65,44 +80,47 @@ public class ServersUtil {
 
   public boolean isServerGroupsSupported(String currentVersion) {return !currentVersion.startsWith("2.0");}
 
-  public List<Server> showServerGroups(CommandCenter commandCenter) {
+  public List<Server> showServerGroups(Set<ServerKind> kinds) {
     ServerGroupOperations sgo = commandCenter.serverGroupOperations();
     List<ServerGroup> topLevelServerGroups = sgo.getAllGroups();
     List<Server> allCheckBoxes = new ArrayList<Server>();
     for (ServerGroup serverGroup : topLevelServerGroups) {
-      if (hasServers(serverGroup).contains(true)) //do not add empty groups
-        allCheckBoxes.addAll(processSiblings(serverGroup, "", 0));
+      if (hasServers(serverGroup, kinds)) //do not add empty groups
+        allCheckBoxes.addAll(processSiblings(serverGroup, "", 0, kinds));
     }
 
     return allCheckBoxes;
   }
 
-  public List<Boolean> hasServers(ServerGroup serverGroup) {
+  public boolean hasServers(ServerGroup serverGroup, Set<ServerKind> kinds) {
     if (!serverGroup.getServers().isEmpty()) {
-      return Lists.newArrayList(true);
+      for (ServerInfo server : serverGroup.getServers()) {
+        if (kinds.contains(server.getType()))
+          return true;
+      }
     }
-    ArrayList<Boolean> hasServers = new ArrayList<Boolean>();
     for (ServerGroup child : serverGroup.getChildren()) {
-      hasServers.addAll(hasServers(child));
+      if (hasServers(child, kinds)) return true;
     }
-    return hasServers;
+    return false;
   }
 
-  public List<Server> processSiblings(ServerGroup serverGroup, String parentNames, int indentDepth) {
+  public List<Server> processSiblings(ServerGroup serverGroup, String parentNames, int indentDepth, Set<ServerKind> kinds) {
     Server serverCheckbox = new ServerImpl(serverGroup.getName(), serverGroup.getName(), parentNames, indentDepth, false, false, true, null, false, null, null);
     ArrayList<Server> serverCheckboxes = new ArrayList<Server>();
     serverCheckboxes.add(serverCheckbox);
     if (serverGroup.getChildren().size() != 0) {
       for (ServerGroup child : serverGroup.getChildren()) {
-        if (hasServers(child).contains(true)) //do not add empty groups
-          serverCheckboxes.addAll(processSiblings(child, "lr-" + serverGroup.getName().replaceAll("[^A-Za-z0-9]", "_"), indentDepth + 1));
+        if (hasServers(child, kinds)) //do not add empty groups
+          serverCheckboxes.addAll(processSiblings(child, "lr-" + serverGroup.getName().replaceAll("[^A-Za-z0-9]", "_"), indentDepth + 1, kinds));
       }
     }
 
     if (serverGroup.getServers().size() != 0) {
       for (ServerInfo server : serverGroup.getServers()) {
-        serverCheckboxes.add(new ServerImpl(server.getId(), server.getName(), "lr-" + serverGroup.getName().replaceAll("[^A-Za-z0-9]", "_"), indentDepth + 1, false,
-            server.isConnected(), false, server.getType(), server.isVirtualHostsSupported(), server.getDefaultVirtualHostName(), server.getVirtualHostNames()));
+        if (kinds.contains(server.getType()))
+          serverCheckboxes.add(new ServerImpl(server.getId(), server.getName(), "lr-" + serverGroup.getName().replaceAll("[^A-Za-z0-9]", "_"), indentDepth + 1, false,
+              server.isConnected(), false, server.getType(), server.isVirtualHostsSupported(), server.getDefaultVirtualHostName(), server.getVirtualHostNames()));
       }
     }
 
