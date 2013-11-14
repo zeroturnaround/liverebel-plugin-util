@@ -495,4 +495,17 @@ public class PluginUtil {
         "\n\n"
         );
   }
+
+  public void close() {
+    if (this.commandCenter != null) {
+      try {
+        this.commandCenter.close();
+      }
+      catch (Exception e) {
+        logger.error("should never happen", e);
+      }
+      this.commandCenter = null;
+    }
+  }
+
 }
