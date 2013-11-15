@@ -4,7 +4,7 @@
 
   <groupId>org.zeroturnaround</groupId>
   <artifactId>liverebel-plugin-util</artifactId>
-  <version>1.0.10</version>
+  <version>1.0.11-SNAPSHOT</version>
   <name>LiveRebel Plugin Utilities</name>
   <description>LiveRebel Plugin Utilities incorporates common logic within different LiveRebel Continuous Integration
     server plugins like LiveRebel Jenkins plugin and LiveRebel Bamboo plugin.
