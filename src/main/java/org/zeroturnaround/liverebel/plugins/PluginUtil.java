@@ -90,7 +90,7 @@ public class PluginUtil {
     }
     catch (RuntimeException e) {
       if (e.getCause() instanceof ZipException) {
-        logger.error("Unable to read artifact ({}). The file you trying to deploy is not an artifact or may be corrupted.", conf.deployable);
+        logger.error("Unable to read artifact ({}). The file you trying to deploy is not a ZIP archive or may be corrupted.", conf.deployable);
       }
       else {
         logger.error("Unexpected error occured!", e);
