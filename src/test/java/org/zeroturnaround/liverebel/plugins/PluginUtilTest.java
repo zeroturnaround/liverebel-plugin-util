@@ -1,6 +1,6 @@
 package org.zeroturnaround.liverebel.plugins;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
@@ -15,7 +15,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,7 +23,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -40,7 +38,6 @@ import org.zeroturnaround.liverebel.test.utils.TestSchemaInfoImpl;
 import org.zeroturnaround.liverebel.test.utils.TestServerInfoImpl;
 import org.zeroturnaround.liverebel.test.utils.TestUpdateStrategiesImpl;
 import org.zeroturnaround.zip.ZipUtil;
-import org.zeroturnaround.zip.transform.ZipEntryTransformerEntry;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -59,6 +56,9 @@ import com.zeroturnaround.liverebel.util.LiveRebelXml;
 import com.zeroturnaround.liverebel.util.ServerKind;
 
 public class PluginUtilTest {
+
+  private static final boolean IS_DEBUG_LOGGING_ENABLED = false;
+
   private static final File archivesDir = new File(PluginUtilTest.class.getResource("archives").getFile());
   private static final Map<String, ServerInfo> mockedServers = createMockedServer();
   private static final Map<Long, SchemaInfo> mockedSchemas = createMockedSchemas();
@@ -72,7 +72,8 @@ public class PluginUtilTest {
   public void configureLogging() {
     this.testOutput = new ByteArrayOutputStream(1024);
     PrintStream ps = new PrintStream(this.testOutput);
-    logListener = PluginLoggerFactory.getInstance().addBuildLogListener(ps, "test", getTestName() + " ", null, true);
+    logListener = PluginLoggerFactory.getInstance().addBuildLogListener(
+        ps, "test", getTestName() + " ", null, IS_DEBUG_LOGGING_ENABLED);
   }
 
   private String getTestName() {
@@ -158,7 +159,11 @@ public class PluginUtilTest {
   }
 
   private void assertBuildLogDoesNotContainExceptions() {
-    assertTrue("log should not contain exceptions", !getTestBuildLog().contains("Exception"));
+    //when debug logging is enabled, there will be exceptions,
+    //so we check for exceptions only when debug logging is disabled
+    if (!IS_DEBUG_LOGGING_ENABLED) {
+      assertTrue("log should not contain exceptions", !getTestBuildLog().contains("Exception"));
+    }
   }
   private void assertBuildLogDoesNotContainErrors() {
     assertTrue("log should not contain error level rows", !getTestBuildLog().contains("ERROR"));
