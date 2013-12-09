@@ -74,13 +74,22 @@ public class PluginUtil {
       success = true;
     }
     catch (Conflict e) {
-      logger.error("Error from LiveRebel API: {}", e.getMessage());
+      if (logger.isDebugEnabled())
+        logger.error("Error from LiveRebel API", e);
+      else
+        logger.error("Error from LiveRebel API: {}", e.getMessage());
     }
     catch (IllegalArgumentException e) {
-      logger.error("Not a valid argument: {}", e.getMessage());
+      if (logger.isDebugEnabled())
+        logger.error("Not a valid argument", e);
+      else
+        logger.error("Not a valid argument: {}", e.getMessage());
     }
     catch (IllegalStateException e) {
-      logger.error("Unexpected state: {}", e.getMessage());
+      if (logger.isDebugEnabled())
+        logger.error("Unexpected state", e);
+      else
+        logger.error("Unexpected state: {}", e.getMessage());
     }
     catch (com.zeroturnaround.liverebel.api.Error e) {
       logger.error("Unexpected error received from Command Center!\nURL: {}\nStatus code: {}\nMessage: {}", new Object[] { e.getURL(), e.getStatus(), e.getMessage()});
