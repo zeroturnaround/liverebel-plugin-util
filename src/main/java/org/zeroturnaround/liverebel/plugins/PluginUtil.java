@@ -69,7 +69,10 @@ public class PluginUtil {
     try {
       PluginConfVerifier.verifyConf(conf);
       logger.debug("configuration verified: {}", conf);
-      tempFileCreated = checkForLiveRebelXmlOverride(conf);
+      //in case of undeploy, there is no override information
+      if (conf.getAction() != PluginConf.Action.UNDEPLOY) {
+        tempFileCreated = checkForLiveRebelXmlOverride(conf);
+      }
       doActions(conf);
       success = true;
     }
